@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:/app/data/db/myrag;MODE=MySQL;AUTO_SERVER=TRUE;DATABASE_TO_LOWER=TRUE
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+app:
+  import:
+    storage-path: /app/data/imports
