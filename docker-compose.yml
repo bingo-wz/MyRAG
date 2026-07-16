@@ -2,6 +2,9 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        UBUNTU_MIRROR: ${UBUNTU_MIRROR:-http://ports.ubuntu.com/ubuntu-ports}
+        MAVEN_MIRROR: ${MAVEN_MIRROR:-https://repo.maven.apache.org/maven2}
     container_name: myrag-backend
     restart: unless-stopped
     volumes:
