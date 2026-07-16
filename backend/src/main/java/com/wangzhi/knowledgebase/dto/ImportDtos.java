@@ -22,12 +22,14 @@ public final class ImportDtos {
             Long documentId,
             String errorMessage,
             int retryCount,
+            String contentHash,
+            boolean storageDeduplicated,
             LocalDateTime updatedAt
     ) {
         public static FileView from(ImportFileTask task) {
             return new FileView(task.getId(), task.getOriginalName(), task.getDetectedType(), task.getSizeBytes(),
                     task.getStatus(), task.getExtractedCharacters(), task.getDocumentId(), task.getErrorMessage(),
-                    task.getRetryCount(), task.getUpdatedAt());
+                    task.getRetryCount(), task.getContentHash(), task.isStorageDeduplicated(), task.getUpdatedAt());
         }
     }
 

@@ -13,6 +13,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    enabled: false
   servlet:
     multipart:
       max-file-size: 20MB
@@ -27,16 +29,38 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
 
 app:
   demo-data: true
   import:
     storage-path: ./data/imports
     max-files-per-batch: 50
+    max-file-size-bytes: 20971520
+    max-batch-size-bytes: 104857600
     max-extracted-characters: 2000000
     ocr-language: chi_sim+eng
+    worker-enabled: true
+    poll-interval-ms: 500
+    recovery-delay-ms: 500
+    lease-seconds: 300
+    max-attempts: 5
+  storage:
+    provider: filesystem
+    root: ./data/imports
+  kafka:
+    enabled: false
+    import-topic: myrag.import.requested.v1
+  embedding:
+    provider: hash
+    dimensions: 256
+  vector:
+    store: inline
   retrieval:
     top-k: 4
     min-score: 0.08
-    chunk-size: 420
+    target-tokens: 480
+    overlap-tokens: 60

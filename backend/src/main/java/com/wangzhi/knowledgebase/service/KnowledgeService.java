@@ -12,6 +12,7 @@ import com.wangzhi.knowledgebase.dto.KnowledgeDtos.UpdateRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.View;
 import com.wangzhi.knowledgebase.repository.KnowledgeChunkRepository;
 import com.wangzhi.knowledgebase.repository.KnowledgeDocumentRepository;
+import com.wangzhi.knowledgebase.service.ChunkingService.ChunkDraft;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,15 +34,18 @@ public class KnowledgeService {
     private final KnowledgeChunkRepository chunkRepository;
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
+    private final ChunkVectorIndex vectorIndex;
 
     public KnowledgeService(KnowledgeDocumentRepository documentRepository,
                             KnowledgeChunkRepository chunkRepository,
                             ChunkingService chunkingService,
-                            EmbeddingService embeddingService) {
+                            EmbeddingService embeddingService,
+                            ChunkVectorIndex vectorIndex) {
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
         this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
+        this.vectorIndex = vectorIndex;
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +69,16 @@ public class KnowledgeService {
         KnowledgeDocument document = new KnowledgeDocument();
         apply(document, request.title(), request.content(), request.domain(), request.source(), request.tags());
         document.setCreatedBy(request.createdBy().trim());
-        return View.from(saveAndIndex(document));
+        return View.from(saveAndIndex(document, defaultBlocks(request.title(), request.content())));
+    }
+
+    @Transactional
+    public View createImported(CreateRequest request, List<ParsedBlock> blocks, String sourceHash) {
+        KnowledgeDocument document = new KnowledgeDocument();
+        apply(document, request.title(), request.content(), request.domain(), request.source(), request.tags());
+        document.setCreatedBy(request.createdBy().trim());
+        document.setSourceHash(sourceHash);
+        return View.from(saveAndIndex(document, blocks));
     }
 
     @Transactional
@@ -77,7 +90,7 @@ public class KnowledgeService {
         apply(document, request.title(), request.content(), request.domain(), request.source(), request.tags());
         document.setStatus(KnowledgeStatus.DRAFT);
         document.setReviewComment(null);
-        return View.from(saveAndIndex(document));
+        return View.from(saveAndIndex(document, defaultBlocks(request.title(), request.content())));
     }
 
     @Transactional
@@ -88,7 +101,9 @@ public class KnowledgeService {
         }
         document.setStatus(KnowledgeStatus.PENDING_REVIEW);
         document.setReviewComment(null);
-        return View.from(documentRepository.save(document));
+        KnowledgeDocument saved = documentRepository.save(document);
+        vectorIndex.updateDocumentStatus(saved.getId(), saved.getStatus());
+        return View.from(saved);
     }
 
     @Transactional
@@ -100,7 +115,9 @@ public class KnowledgeService {
         document.setStatus(request.approved() ? KnowledgeStatus.APPROVED : KnowledgeStatus.REJECTED);
         document.setReviewer(request.reviewer().trim());
         document.setReviewComment(blankToNull(request.comment()));
-        return View.from(documentRepository.save(document));
+        KnowledgeDocument saved = documentRepository.save(document);
+        vectorIndex.updateDocumentStatus(saved.getId(), saved.getStatus());
+        return View.from(saved);
     }
 
     @Transactional
@@ -110,7 +127,9 @@ public class KnowledgeService {
             throw new BusinessException(HttpStatus.CONFLICT, "只有已生效知识可以下线");
         }
         document.setStatus(KnowledgeStatus.OFFLINE);
-        return View.from(documentRepository.save(document));
+        KnowledgeDocument saved = documentRepository.save(document);
+        vectorIndex.updateDocumentStatus(saved.getId(), saved.getStatus());
+        return View.from(saved);
     }
 
     @Transactional
@@ -120,7 +139,9 @@ public class KnowledgeService {
             throw new BusinessException(HttpStatus.CONFLICT, "只有已下线知识可以重新提交");
         }
         document.setStatus(KnowledgeStatus.PENDING_REVIEW);
-        return View.from(documentRepository.save(document));
+        KnowledgeDocument saved = documentRepository.save(document);
+        vectorIndex.updateDocumentStatus(saved.getId(), saved.getStatus());
+        return View.from(saved);
     }
 
     @Transactional
@@ -175,24 +196,46 @@ public class KnowledgeService {
         if (document.getStatus() == KnowledgeStatus.APPROVED || document.getStatus() == KnowledgeStatus.PENDING_REVIEW) {
             throw new BusinessException(HttpStatus.CONFLICT, "待审核或已生效知识不能删除");
         }
+        vectorIndex.deleteDocument(id);
         chunkRepository.deleteByDocumentId(id);
         documentRepository.delete(document);
     }
 
-    private KnowledgeDocument saveAndIndex(KnowledgeDocument document) {
+    private KnowledgeDocument saveAndIndex(KnowledgeDocument document, List<ParsedBlock> blocks) {
         KnowledgeDocument saved = documentRepository.save(document);
+        vectorIndex.deleteDocument(saved.getId());
         chunkRepository.deleteByDocumentId(saved.getId());
-        List<String> chunks = chunkingService.split(saved.getContent());
-        for (int index = 0; index < chunks.size(); index++) {
+        long indexVersion = saved.getIndexVersion() + 1;
+        List<ChunkDraft> drafts = chunkingService.split(saved.getTitle(), blocks);
+        List<double[]> vectors = embeddingService.embedAll(drafts.stream().map(ChunkDraft::content).toList());
+        List<KnowledgeChunk> chunks = new ArrayList<>(drafts.size());
+        for (int index = 0; index < drafts.size(); index++) {
+            ChunkDraft draft = drafts.get(index);
             KnowledgeChunk chunk = new KnowledgeChunk();
             chunk.setDocumentId(saved.getId());
             chunk.setChunkIndex(index);
-            chunk.setContent(chunks.get(index));
-            chunk.setEmbedding(serialize(embeddingService.embed(chunks.get(index))));
-            chunkRepository.save(chunk);
+            chunk.setDocumentVersion(indexVersion);
+            chunk.setContent(draft.content());
+            chunk.setContentHash(draft.contentHash());
+            chunk.setTokenCount(draft.tokenCount());
+            chunk.setHeadingPath(blankToNull(draft.headingPath()));
+            chunk.setLocator(blankToNull(draft.locator()));
+            chunk.setPageNumber(draft.pageNumber());
+            chunk.setEmbeddingModel(embeddingService.modelName());
+            if (vectorIndex.inlineEmbedding()) {
+                chunk.setEmbedding(serialize(vectors.get(index)));
+            }
+            chunks.add(chunk);
         }
-        saved.setChunkCount(chunks.size());
+        chunkRepository.saveAllAndFlush(chunks);
+        vectorIndex.index(chunks, vectors);
+        saved.setChunkCount(drafts.size());
+        saved.setIndexVersion(indexVersion);
         return documentRepository.save(saved);
+    }
+
+    private List<ParsedBlock> defaultBlocks(String title, String content) {
+        return List.of(new ParsedBlock("paragraph", content, 1, title, "manual"));
     }
 
     private void apply(KnowledgeDocument document, String title, String content, String domain, String source, String tags) {

@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
         "app.demo-data=false",
-        "app.import.storage-path=${java.io.tmpdir}/myrag-import-tests"
+        "app.import.storage-path=${java.io.tmpdir}/myrag-import-tests",
+        "spring.datasource.url=jdbc:h2:mem:import_pipeline;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE"
 })
 class ImportPipelineIntegrationTest {
 

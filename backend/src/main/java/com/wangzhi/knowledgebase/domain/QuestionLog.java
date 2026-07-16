@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
@@ -25,8 +24,7 @@ public class QuestionLog {
     @Column(nullable = false, length = 1000)
     private String question;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String answer;
 
     @Column(nullable = false)
@@ -43,7 +41,7 @@ public class QuestionLog {
     @Column(length = 500)
     private String badReason;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String sourceSnapshot;
 
     @Column(nullable = false)

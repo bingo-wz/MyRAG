@@ -28,7 +28,13 @@ public class ImportFileTask {
     private String originalName;
 
     @Column(nullable = false, length = 500)
-    private String storedPath;
+    private String storageKey;
+
+    @Column(nullable = false, length = 64)
+    private String contentHash;
+
+    @Column(nullable = false)
+    private boolean storageDeduplicated;
 
     @Column(length = 160)
     private String detectedType;
@@ -72,8 +78,12 @@ public class ImportFileTask {
     public void setBatchId(String batchId) { this.batchId = batchId; }
     public String getOriginalName() { return originalName; }
     public void setOriginalName(String originalName) { this.originalName = originalName; }
-    public String getStoredPath() { return storedPath; }
-    public void setStoredPath(String storedPath) { this.storedPath = storedPath; }
+    public String getStorageKey() { return storageKey; }
+    public void setStorageKey(String storageKey) { this.storageKey = storageKey; }
+    public String getContentHash() { return contentHash; }
+    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
+    public boolean isStorageDeduplicated() { return storageDeduplicated; }
+    public void setStorageDeduplicated(boolean storageDeduplicated) { this.storageDeduplicated = storageDeduplicated; }
     public String getDetectedType() { return detectedType; }
     public void setDetectedType(String detectedType) { this.detectedType = detectedType; }
     public long getSizeBytes() { return sizeBytes; }

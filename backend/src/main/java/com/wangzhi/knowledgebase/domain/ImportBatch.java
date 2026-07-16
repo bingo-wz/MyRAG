@@ -44,6 +44,19 @@ public class ImportBatch {
     @Column(nullable = false)
     private int failedFiles;
 
+    @Column(length = 100)
+    private String workerId;
+
+    private LocalDateTime leaseUntil;
+
+    private LocalDateTime nextAttemptAt;
+
+    @Column(nullable = false)
+    private int attemptCount;
+
+    @Column(length = 800)
+    private String lastError;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -80,6 +93,16 @@ public class ImportBatch {
     public void setSucceededFiles(int succeededFiles) { this.succeededFiles = succeededFiles; }
     public int getFailedFiles() { return failedFiles; }
     public void setFailedFiles(int failedFiles) { this.failedFiles = failedFiles; }
+    public String getWorkerId() { return workerId; }
+    public void setWorkerId(String workerId) { this.workerId = workerId; }
+    public LocalDateTime getLeaseUntil() { return leaseUntil; }
+    public void setLeaseUntil(LocalDateTime leaseUntil) { this.leaseUntil = leaseUntil; }
+    public LocalDateTime getNextAttemptAt() { return nextAttemptAt; }
+    public void setNextAttemptAt(LocalDateTime nextAttemptAt) { this.nextAttemptAt = nextAttemptAt; }
+    public int getAttemptCount() { return attemptCount; }
+    public void setAttemptCount(int attemptCount) { this.attemptCount = attemptCount; }
+    public String getLastError() { return lastError; }
+    public void setLastError(String lastError) { this.lastError = lastError; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

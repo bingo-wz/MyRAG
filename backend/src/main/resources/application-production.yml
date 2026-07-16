@@ -1,0 +1,102 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/myrag}
+    driver-class-name: org.postgresql.Driver
+    username: ${DATABASE_USERNAME:myrag}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:12}
+      minimum-idle: 2
+      connection-timeout: 10000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      acks: all
+      compression-type: zstd
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:20MB}
+      max-request-size: ${MAX_REQUEST_SIZE:100MB}
+
+app:
+  demo-data: false
+  readiness:
+    enabled: true
+  storage:
+    provider: minio
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+      access-key: ${MINIO_ACCESS_KEY}
+      secret-key: ${MINIO_SECRET_KEY}
+      bucket: ${MINIO_BUCKET:myrag-knowledge}
+  kafka:
+    enabled: true
+    import-topic: ${KAFKA_IMPORT_TOPIC:myrag.import.requested.v1}
+    consumer-group: ${KAFKA_CONSUMER_GROUP:myrag-import-workers}
+    concurrency: ${KAFKA_CONCURRENCY:1}
+    partitions: ${KAFKA_IMPORT_PARTITIONS:3}
+    replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
+    outbox-poll-ms: 500
+    outbox-batch-size: 20
+    outbox-lease-seconds: 30
+    outbox-retention-days: ${OUTBOX_RETENTION_DAYS:7}
+  import:
+    worker-enabled: true
+    poll-interval-ms: 30000
+    recovery-delay-ms: 60000
+    lease-seconds: 600
+    max-attempts: 5
+  embedding:
+    provider: openai-compatible
+    base-url: ${EMBEDDING_BASE_URL}
+    api-key: ${EMBEDDING_API_KEY:}
+    model: ${EMBEDDING_MODEL:bge-m3}
+    dimensions: ${EMBEDDING_DIMENSIONS:1024}
+    batch-size: ${EMBEDDING_BATCH_SIZE:32}
+    max-attempts: 3
+  vector:
+    store: milvus
+    milvus:
+      uri: ${MILVUS_URI:http://milvus:19530}
+      token: ${MILVUS_TOKEN:root:Milvus}
+      collection: ${MILVUS_COLLECTION:myrag_chunks_v1}
+      batch-size: 64
+  retrieval:
+    top-k: ${RETRIEVAL_TOP_K:6}
+    min-score: ${RETRIEVAL_MIN_SCORE:0.18}
+    target-tokens: ${CHUNK_TARGET_TOKENS:480}
+    overlap-tokens: ${CHUNK_OVERLAP_TOKENS:60}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,productionReadiness,db

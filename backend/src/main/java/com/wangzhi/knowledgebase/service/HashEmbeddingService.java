@@ -1,5 +1,7 @@
 package com.wangzhi.knowledgebase.service;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -7,20 +9,40 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
+@ConditionalOnProperty(name = "app.embedding.provider", havingValue = "hash", matchIfMissing = true)
 public class HashEmbeddingService implements EmbeddingService {
 
-    private static final int DIMENSIONS = 256;
+    private final int dimensions;
+
+    public HashEmbeddingService(@Value("${app.embedding.dimensions:256}") int dimensions) {
+        this.dimensions = dimensions;
+    }
 
     @Override
     public double[] embed(String text) {
-        double[] vector = new double[DIMENSIONS];
+        double[] vector = new double[dimensions];
         for (String token : tokenize(text)) {
             int hash = token.hashCode();
-            int index = Math.floorMod(hash, DIMENSIONS);
+            int index = Math.floorMod(hash, dimensions);
             vector[index] += 1.0;
         }
         normalize(vector);
         return vector;
+    }
+
+    @Override
+    public int dimensions() {
+        return dimensions;
+    }
+
+    @Override
+    public String modelName() {
+        return "hashing-dev-" + dimensions;
+    }
+
+    @Override
+    public boolean semantic() {
+        return false;
     }
 
     private List<String> tokenize(String text) {

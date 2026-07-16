@@ -8,19 +8,17 @@ import com.wangzhi.knowledgebase.domain.ImportFileTask;
 import com.wangzhi.knowledgebase.dto.ImportDtos.BatchView;
 import com.wangzhi.knowledgebase.repository.ImportBatchRepository;
 import com.wangzhi.knowledgebase.repository.ImportFileTaskRepository;
+import com.wangzhi.knowledgebase.storage.ObjectStorageService;
+import com.wangzhi.knowledgebase.storage.StoredObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -37,23 +35,29 @@ public class ImportBatchService {
 
     private final ImportBatchRepository batchRepository;
     private final ImportFileTaskRepository fileRepository;
-    private final ImportProcessor importProcessor;
     private final KnowledgeService knowledgeService;
-    private final Path storageRoot;
+    private final ObjectStorageService storageService;
+    private final ImportDispatch importDispatch;
     private final int maxFilesPerBatch;
+    private final long maxFileSizeBytes;
+    private final long maxBatchSizeBytes;
 
     public ImportBatchService(ImportBatchRepository batchRepository,
                               ImportFileTaskRepository fileRepository,
-                              ImportProcessor importProcessor,
                               KnowledgeService knowledgeService,
-                              @Value("${app.import.storage-path:./data/imports}") String storagePath,
-                              @Value("${app.import.max-files-per-batch:50}") int maxFilesPerBatch) {
+                              ObjectStorageService storageService,
+                              ImportDispatch importDispatch,
+                              @Value("${app.import.max-files-per-batch:50}") int maxFilesPerBatch,
+                              @Value("${app.import.max-file-size-bytes:20971520}") long maxFileSizeBytes,
+                              @Value("${app.import.max-batch-size-bytes:104857600}") long maxBatchSizeBytes) {
         this.batchRepository = batchRepository;
         this.fileRepository = fileRepository;
-        this.importProcessor = importProcessor;
         this.knowledgeService = knowledgeService;
-        this.storageRoot = Path.of(storagePath).toAbsolutePath().normalize();
+        this.storageService = storageService;
+        this.importDispatch = importDispatch;
         this.maxFilesPerBatch = maxFilesPerBatch;
+        this.maxFileSizeBytes = maxFileSizeBytes;
+        this.maxBatchSizeBytes = maxBatchSizeBytes;
     }
 
     @Transactional
@@ -69,13 +73,6 @@ public class ImportBatchService {
         }
         validateFiles(files);
         String batchId = "IMP" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
-        Path batchDirectory = storageRoot.resolve(batchId);
-        try {
-            Files.createDirectories(batchDirectory);
-        } catch (IOException exception) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "导入存储目录创建失败");
-        }
-
         ImportBatch batch = new ImportBatch();
         batch.setId(batchId);
         batch.setStatus(ImportBatchStatus.QUEUED);
@@ -88,25 +85,23 @@ public class ImportBatchService {
         for (int index = 0; index < files.length; index++) {
             MultipartFile file = files[index];
             String originalName = safeOriginalName(file.getOriginalFilename());
-            String storedName = "%03d_%s".formatted(index + 1, originalName);
-            Path target = batchDirectory.resolve(storedName).normalize();
-            if (!target.startsWith(batchDirectory)) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, "文件名不合法");
-            }
+            StoredObject stored;
             try {
-                Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                stored = storageService.store(file);
             } catch (IOException exception) {
                 throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "文件保存失败：" + originalName);
             }
             ImportFileTask task = new ImportFileTask();
             task.setBatchId(batchId);
             task.setOriginalName(originalName);
-            task.setStoredPath(target.toString());
-            task.setSizeBytes(file.getSize());
+            task.setStorageKey(stored.key());
+            task.setContentHash(stored.sha256());
+            task.setStorageDeduplicated(stored.deduplicated());
+            task.setSizeBytes(stored.sizeBytes());
             task.setStatus(ImportFileStatus.QUEUED);
             fileRepository.save(task);
         }
-        schedule(batchId, false);
+        importDispatch.dispatch(batchId);
         return get(batchId);
     }
 
@@ -139,8 +134,13 @@ public class ImportBatchService {
         batch.setStatus(ImportBatchStatus.QUEUED);
         batch.setProcessedFiles(batch.getProcessedFiles() - failed.size());
         batch.setFailedFiles(0);
+        batch.setAttemptCount(0);
+        batch.setNextAttemptAt(null);
+        batch.setWorkerId(null);
+        batch.setLeaseUntil(null);
+        batch.setLastError(null);
         batchRepository.save(batch);
-        schedule(batchId, true);
+        importDispatch.dispatch(batchId);
         return get(batchId);
     }
 
@@ -179,10 +179,17 @@ public class ImportBatchService {
     }
 
     private void validateFiles(MultipartFile[] files) {
+        long totalSize = Arrays.stream(files).mapToLong(MultipartFile::getSize).sum();
+        if (totalSize > maxBatchSizeBytes) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "批次文件总大小超过限制");
+        }
         Arrays.stream(files).forEach(file -> {
             String name = safeOriginalName(file.getOriginalFilename());
             if (file.isEmpty()) {
                 throw new BusinessException(HttpStatus.BAD_REQUEST, "文件为空：" + name);
+            }
+            if (file.getSize() > maxFileSizeBytes) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "文件大小超过限制：" + name);
             }
             int dot = name.lastIndexOf('.');
             String extension = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
@@ -200,19 +207,6 @@ public class ImportBatchService {
     private ImportBatch requireBatch(String batchId) {
         return batchRepository.findById(batchId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "导入批次不存在"));
-    }
-
-    private void schedule(String batchId, boolean retry) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    importProcessor.process(batchId, retry);
-                }
-            });
-        } else {
-            importProcessor.process(batchId, retry);
-        }
     }
 
     private String csv(String value) {

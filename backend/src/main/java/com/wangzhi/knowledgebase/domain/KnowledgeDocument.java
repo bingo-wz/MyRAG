@@ -7,7 +7,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -26,8 +25,7 @@ public class KnowledgeDocument {
     @Column(nullable = false, length = 180)
     private String title;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column(nullable = false, length = 80)
@@ -51,6 +49,12 @@ public class KnowledgeDocument {
 
     @Column(nullable = false)
     private int chunkCount;
+
+    @Column(nullable = false)
+    private long indexVersion;
+
+    @Column(length = 64)
+    private String sourceHash;
 
     @Column(nullable = false, length = 80)
     private String createdBy;
@@ -99,6 +103,10 @@ public class KnowledgeDocument {
     public void setReviewer(String reviewer) { this.reviewer = reviewer; }
     public int getChunkCount() { return chunkCount; }
     public void setChunkCount(int chunkCount) { this.chunkCount = chunkCount; }
+    public long getIndexVersion() { return indexVersion; }
+    public void setIndexVersion(long indexVersion) { this.indexVersion = indexVersion; }
+    public String getSourceHash() { return sourceHash; }
+    public void setSourceHash(String sourceHash) { this.sourceHash = sourceHash; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }

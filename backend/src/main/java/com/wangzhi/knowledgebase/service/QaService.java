@@ -7,7 +7,6 @@ import com.wangzhi.knowledgebase.dto.QaDtos.AskResponse;
 import com.wangzhi.knowledgebase.dto.QaDtos.FeedbackRequest;
 import com.wangzhi.knowledgebase.dto.QaDtos.Source;
 import com.wangzhi.knowledgebase.repository.QuestionLogRepository;
-import com.wangzhi.knowledgebase.service.RetrievalService.RetrievedChunk;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,7 +75,7 @@ public class QaService {
         answer.append("根据知识库中已审核生效的内容：\n\n");
         int count = 0;
         for (RetrievedChunk item : retrieved) {
-            String text = item.chunk().getContent().replaceAll("\\s+", " ").trim();
+            String text = item.content().replaceAll("\\s+", " ").trim();
             if (text.length() > 220) {
                 text = text.substring(0, 220) + "…";
             }

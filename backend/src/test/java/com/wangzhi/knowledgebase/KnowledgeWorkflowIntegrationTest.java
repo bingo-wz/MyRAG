@@ -17,7 +17,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "app.demo-data=false")
+@SpringBootTest(properties = {
+        "app.demo-data=false",
+        "app.import.worker-enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:knowledge_workflow;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE"
+})
 class KnowledgeWorkflowIntegrationTest {
 
     @Autowired
