@@ -116,7 +116,7 @@ export PATH="/opt/homebrew/opt/maven/bin:$JAVA_HOME/bin:$PATH"
 - Docker 日志单容器最多 `3 × 10 MB`。
 - Embedding 使用远程 API，避免本机模型权重与推理运行时占用磁盘。
 - Chat Completion 与 Embedding 共用 SiliconFlow API Key；失败时自动退回带来源的抽取式答案。
-- Authing 只托管身份，`roles`、`domains`、Principal Claim 名可配置，供应商切换不侵入业务代码。
+- Authing 只托管身份，API Token 来源以及 `roles`、`domains`、Principal Claim 名均可配置，供应商切换不侵入业务代码。
 - API 与 Worker 共用一个镜像但独立进程，API 不执行解析，Worker 不开放 HTTP 端口。
 - PostgreSQL 用 Flyway 管理 Schema，Milvus 使用 HNSW + mmap，索引可按文档重建。
 

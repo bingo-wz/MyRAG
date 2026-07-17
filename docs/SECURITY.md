@@ -2,13 +2,15 @@
 
 ## Authing OIDC 登录与 JWT 校验
 
-生产身份服务选择 Authing 免费版。前端使用 OIDC Authorization Code + PKCE，浏览器只保存 OIDC Client 维护的用户会话，不保存 Client Secret。Nginx 启动时把公开的 Authority、Client ID、Scope 和 Claim 映射写入 `config.js`；所有 `fetch` 和 CSV 下载自动附加 `Authorization: Bearer <access_token>`。
+生产身份服务选择 Authing 免费版。前端使用 OIDC Authorization Code + PKCE，浏览器只保存 OIDC Client 维护的用户会话，不保存 Client Secret。Nginx 启动时把公开的 Authority、Client ID、Scope、API Token 来源和 Claim 映射写入 `config.js`；所有 `fetch` 和 CSV 下载自动附加 `Authorization: Bearer <token>`。
+
+Authing 的普通 Access Token 只保证携带 `sub` 和 `scope`，而 `roles`、`extended_fields` 等 OIDC Scope Claim 位于 ID Token。MyRAG 因此默认设置 `OIDC_API_TOKEN_SOURCE=id_token`，并要求 Authing 使用 RS256 签发 ID Token；后端仍通过 Issuer、JWKS、有效期和 Audience 完整验签。切换到能在 Access Token 中签发业务 Claim 的 IdP 时，将该变量改为 `access_token` 即可，不需要修改业务代码。
 
 后端是无状态 OAuth2 Resource Server，通过 `issuer-uri` 验证签名、签发方、有效期，并通过 `audiences` 验证目标受众。生产 Token 至少需要：
 
 ```json
 {
-  "aud": ["AUTHING_ACCESS_TOKEN_AUDIENCE"],
+  "aud": ["AUTHING_APP_ID"],
   "preferred_username": "zhangsan",
   "roles": ["KNOWLEDGE_OPERATOR"],
   "domains": ["售后服务", "产品知识"]
@@ -21,6 +23,7 @@ Claim 名不写死在业务代码中：
 
 | 环境变量 | 默认值 | 用途 |
 | --- | --- | --- |
+| `OIDC_API_TOKEN_SOURCE` | `id_token` | API Bearer Token 来源，可选 `id_token` 或 `access_token` |
 | `OIDC_PRINCIPAL_CLAIM` | `preferred_username` | 后端审计身份和前端显示名 |
 | `OIDC_ROLES_CLAIM` | `roles` | RBAC 角色列表或逗号/空格分隔字符串 |
 | `OIDC_DOMAINS_CLAIM` | `domains` | 可访问知识领域列表或逗号分隔字符串 |
@@ -30,13 +33,13 @@ Claim 名不写死在业务代码中：
 ## Authing 免费版配置
 
 1. 在 Authing 创建自建 SPA 应用，Issuer 使用 `https://<应用域名>.authing.cn/oidc`。
-2. 启用 Authorization Code + PKCE，Token Endpoint 身份验证方式选择 `none`，不要把 App Secret 放进前端。
+2. 启用 Authorization Code + PKCE，Token Endpoint 身份验证方式选择 `none`，ID Token 签名算法选择 `RS256`，不要把 App Secret 放进前端。
 3. 登记 `https://<MyRAG域名>/auth/callback`，本机验证时为 `http://localhost:3000/auth/callback`；同时登记登出回跳地址。
 4. 创建 `ADMIN`、`KNOWLEDGE_OPERATOR`、`REVIEWER`、`USER` 角色并分配用户；请求 Scope 配置为 `roles extended_fields`。
-5. 建立用户扩展字段 `domains`，并在 OIDC Claim/Access Token 签发配置中把 Principal、角色和领域写入 Access Token。Authing 的普通 Access Token 可能只含 `sub`、`scope` 等基础字段，必须解码实际 Token 确认后再上线。
-6. `OIDC_CLIENT_ID` 使用 Authing App ID；`OAUTH2_AUDIENCE` 使用真实 Access Token 中的 `aud`。不同授权资源下两者可能不同，不要凭名称猜测；前后端 Authority/Issuer 必须完全一致。
+5. 建立用户扩展字段 `domains`，并在 OIDC Scope/Claim 配置中将其加入 ID Token；`roles` 使用 Authing 内置 Scope。
+6. `OIDC_CLIENT_ID` 与 `OAUTH2_AUDIENCE` 均使用 Authing App ID；前后端 Authority/Issuer 必须完全一致。
 
-Authing 的 `roles` 是内置 OIDC Scope；自定义字段可以通过 `extended_fields` 或自定义 Claim 暴露。MyRAG 始终使用 Access Token 调用 API，不接受用 ID Token 代替 API 凭证。
+Authing 的 `roles` 是内置 OIDC Scope；自定义字段可以通过 `extended_fields` 或自定义 Claim 暴露。选择 ID Token 作为 API 凭证是 Authing 的兼容模式；其他 IdP 应优先使用包含业务 Claim 的 Access Token。
 
 ## 角色矩阵
 
@@ -67,7 +70,7 @@ Authing 的 `roles` 是内置 OIDC Scope；自定义字段可以通过 `extended
 ## 上线核对
 
 - IdP 只允许已登记的 HTTPS Redirect URI，SPA Client 不配置 Secret。
-- 解码一枚真实 Authing Access Token，确认 `iss`、`aud`、Principal、角色和领域均与映射配置一致。
+- 解码一枚真实 Authing ID Token，确认 `alg=RS256`，且 `iss`、`aud`、Principal、角色和领域均与映射配置一致。
 - 网关和 MinIO 全部使用 TLS，密钥进入 Secret Manager，不写入 `.env` 或 Git。
 - 用 `USER`、`REVIEWER`、`KNOWLEDGE_OPERATOR`、`ADMIN` 四类 Token 做正反向权限回归。
 - 用未授权 `domains` 验证列表、详情、问答、导入批次均返回 403。

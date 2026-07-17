@@ -25,7 +25,7 @@ cp .env.example .env
 - `MINIO_SECRET_KEY`
 - `SILICONFLOW_API_KEY`
 - `OAUTH2_ISSUER_URI`、`OAUTH2_AUDIENCE`
-- `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`
+- `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`、`OIDC_API_TOKEN_SOURCE`
 - `OIDC_PRINCIPAL_CLAIM`、`OIDC_ROLES_CLAIM`、`OIDC_DOMAINS_CLAIM`（若 Authing 中采用不同名称）
 
 默认模型配置已经指向 SiliconFlow：
@@ -41,7 +41,7 @@ cp .env.example .env
 
 两类服务通过 OpenAI-compatible 接口接入，可分别用 `EMBEDDING_API_KEY`、`CHAT_API_KEY` 覆盖共用 Key。RAG 默认关闭 Qwen3 思考模式，以缩短时延并把输出预算留给带引用的最终回答。免费模型适合开发和小流量演示，但供应商可能调整价格、限流和模型清单；上线前应调用 `/v1/models` 核对可用性并做限流降级演练。
 
-Authing Issuer 与浏览器 Authority 都使用 `https://<应用域名>.authing.cn/oidc`。SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow。`OAUTH2_AUDIENCE` 必须取真实 Access Token 的 `aud`，不应直接假设等于 App ID。Access Token 至少包含 `aud` 以及配置的 Principal、角色和领域 Claims，详见 [安全配置](SECURITY.md)。
+Authing Issuer 与浏览器 Authority 都使用 `https://<应用域名>.authing.cn/oidc`。SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow，并使用 RS256 签发 ID Token。Authing 默认配置 `OIDC_API_TOKEN_SOURCE=id_token`，`OAUTH2_AUDIENCE` 使用 App ID；如切换到能在 Access Token 中提供业务 Claim 的 IdP，则改为 `access_token` 并使用实际 Access Token Audience。详见 [安全配置](SECURITY.md)。
 
 Apple Silicon 在中国大陆网络下载依赖较慢时，可在 `.env` 设置 `UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports` 和 `MAVEN_MIRROR=https://maven.aliyun.com/repository/public`。两个参数只影响后端镜像构建，默认仍使用官方源；Dockerfile 使用 BuildKit Maven 缓存，重复构建不会反复下载全部依赖。
 

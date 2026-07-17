@@ -12,8 +12,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 async function authorizedFetch(path: string, options?: RequestInit): Promise<Response> {
   const headers = new Headers(options?.headers)
-  const accessToken = await auth.accessToken()
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  const apiToken = await auth.apiToken()
+  if (apiToken) headers.set('Authorization', `Bearer ${apiToken}`)
   const response = await fetch(path, { ...options, headers })
   if (response.status === 401 && auth.configured) {
     await auth.login()

@@ -4,6 +4,7 @@ interface RuntimeConfig {
   oidcAuthority?: string
   oidcClientId?: string
   oidcScopes?: string
+  oidcApiTokenSource?: string
   oidcPrincipalClaim?: string
   oidcRolesClaim?: string
 }
@@ -23,6 +24,7 @@ export interface AuthSession {
 const runtime = window.MYRAG_CONFIG ?? {}
 const authority = runtime.oidcAuthority?.trim() ?? ''
 const clientId = runtime.oidcClientId?.trim() ?? ''
+const apiTokenSource = runtime.oidcApiTokenSource?.trim() === 'id_token' ? 'id_token' : 'access_token'
 const principalClaim = runtime.oidcPrincipalClaim?.trim() || 'preferred_username'
 const rolesClaim = runtime.oidcRolesClaim?.trim() || 'roles'
 const configured = Boolean(authority && clientId)
@@ -101,7 +103,10 @@ async function initialize(): Promise<AuthSession> {
 
 async function login(): Promise<void> {
   if (!manager) return
-  await manager.signinRedirect({ state: window.location.href })
+  const state = window.location.pathname === '/auth/callback'
+    ? `${window.location.origin}/${window.location.hash}`
+    : window.location.href
+  await manager.signinRedirect({ state })
 }
 
 async function logout(): Promise<void> {
@@ -109,10 +114,11 @@ async function logout(): Promise<void> {
   await manager.signoutRedirect()
 }
 
-async function accessToken(): Promise<string | undefined> {
+async function apiToken(): Promise<string | undefined> {
   if (!manager) return undefined
   const user = await manager.getUser()
-  return user && !user.expired ? user.access_token : undefined
+  if (!user || user.expired) return undefined
+  return apiTokenSource === 'id_token' ? user.id_token : user.access_token
 }
 
-export const auth = { configured, initialize, login, logout, accessToken }
+export const auth = { configured, initialize, login, logout, apiToken }

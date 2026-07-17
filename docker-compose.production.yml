@@ -253,6 +253,7 @@ services:
       OIDC_BROWSER_AUTHORITY: ${OIDC_BROWSER_AUTHORITY:?请配置浏览器可访问的 OIDC Authority}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?请配置 OIDC SPA Client ID}
       OIDC_SCOPES: ${OIDC_SCOPES:-roles extended_fields}
+      OIDC_API_TOKEN_SOURCE: ${OIDC_API_TOKEN_SOURCE:-id_token}
       OIDC_PRINCIPAL_CLAIM: ${OIDC_PRINCIPAL_CLAIM:-preferred_username}
       OIDC_ROLES_CLAIM: ${OIDC_ROLES_CLAIM:-roles}
     depends_on:
