@@ -33,7 +33,7 @@ export function KnowledgePage() {
     <div className="knowledge-page">
       <div className="toolbar">
         <div className="segmented">{statuses.map((item) => <button key={item.value} className={status === item.value ? 'active' : ''} onClick={() => setStatus(item.value)}>{item.label}</button>)}</div>
-        <div className="toolbar-actions"><a className="secondary-button" href="/api/knowledge/export"><Download size={16} />导出</a><button className="primary-button" onClick={() => setShowCreate(true)}><Plus size={17} />新建知识</button></div>
+        <div className="toolbar-actions"><button className="secondary-button" onClick={() => api.exportKnowledge()}><Download size={16} />导出</button><button className="primary-button" onClick={() => setShowCreate(true)}><Plus size={17} />新建知识</button></div>
       </div>
       <div className="list-controls"><label className="search-input"><Search size={17} /><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索标题或正文内容" /></label><button><Filter size={16} />领域</button><button><SlidersHorizontal size={16} />更多筛选</button><span>共 {items.length} 条</span></div>
 

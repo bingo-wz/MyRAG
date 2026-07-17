@@ -1,4 +1,10 @@
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OAUTH2_ISSUER_URI}
+          audiences: ${OAUTH2_AUDIENCE:myrag-api}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/myrag}
     driver-class-name: org.postgresql.Driver
@@ -40,7 +46,25 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:100MB}
 
 app:
+  scheduling:
+    await-termination-seconds: 20
+  ai-http:
+    connect-timeout-seconds: ${AI_HTTP_CONNECT_TIMEOUT_SECONDS:3}
+    read-timeout-seconds: ${AI_HTTP_READ_TIMEOUT_SECONDS:60}
   demo-data: false
+  runtime:
+    api-enabled: ${API_ENABLED:true}
+  security:
+    enabled: true
+    audit-enabled: true
+    file-scan:
+      provider: ${FILE_SCAN_PROVIDER:clamav}
+      max-bytes: ${FILE_SCAN_MAX_BYTES:20971520}
+      clamav:
+        host: ${CLAMAV_HOST:clamav}
+        port: ${CLAMAV_PORT:3310}
+        connect-timeout-ms: 3000
+        read-timeout-ms: 30000
   readiness:
     enabled: true
   storage:
@@ -62,11 +86,12 @@ app:
     outbox-lease-seconds: 30
     outbox-retention-days: ${OUTBOX_RETENTION_DAYS:7}
   import:
-    worker-enabled: true
+    worker-enabled: ${APP_IMPORT_WORKER_ENABLED:false}
     poll-interval-ms: 30000
     recovery-delay-ms: 60000
     lease-seconds: 600
     max-attempts: 5
+    parse-timeout-seconds: ${PARSE_TIMEOUT_SECONDS:120}
   embedding:
     provider: openai-compatible
     base-url: ${EMBEDDING_BASE_URL}
@@ -75,8 +100,18 @@ app:
     dimensions: ${EMBEDDING_DIMENSIONS:1024}
     batch-size: ${EMBEDDING_BATCH_SIZE:32}
     max-attempts: 3
+  chat:
+    provider: openai-compatible
+    base-url: ${CHAT_BASE_URL:${EMBEDDING_BASE_URL}}
+    api-key: ${CHAT_API_KEY:${EMBEDDING_API_KEY:}}
+    model: ${CHAT_MODEL}
+    max-tokens: ${CHAT_MAX_TOKENS:800}
+    max-attempts: ${CHAT_MAX_ATTEMPTS:2}
   vector:
     store: milvus
+    reconciliation:
+      enabled: ${VECTOR_RECONCILIATION_ENABLED:true}
+      cron: ${VECTOR_RECONCILIATION_CRON:0 30 3 * * *}
     milvus:
       uri: ${MILVUS_URI:http://milvus:19530}
       token: ${MILVUS_TOKEN:root:Milvus}

@@ -27,7 +27,9 @@ public final class QaDtos {
             String answer,
             double confidence,
             long latencyMs,
-            List<Source> sources
+            List<Source> sources,
+            String model,
+            boolean fallback
     ) {}
 
     public record FeedbackRequest(

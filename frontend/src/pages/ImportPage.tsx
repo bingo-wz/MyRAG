@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingState, Toast } from '../components/Ui'
 import type { ImportBatch, ImportFileTask } from '../types'
 
 const processingStatuses = new Set(['QUEUED', 'PROCESSING'])
-const fileSteps = ['QUEUED', 'DETECTING', 'EXTRACTING', 'VALIDATING', 'INDEXING', 'READY']
+const fileSteps = ['QUEUED', 'SCANNING', 'DETECTING', 'EXTRACTING', 'VALIDATING', 'INDEXING', 'READY']
 
 export function ImportPage() {
   const [batches, setBatches] = useState<ImportBatch[]>([])
@@ -107,7 +107,7 @@ function Uploader({ onCreated }: { onCreated: (batch: ImportBatch) => void }) {
 function BatchDetail({ batch, onRetry, onSubmit }: { batch: ImportBatch; onRetry: (id: string) => void; onSubmit: (id: string) => void }) {
   const canSubmit = batch.status === 'READY' || batch.status === 'PARTIAL_READY'
   return <div className="batch-detail">
-    <div className="batch-summary"><div className="radial-progress" style={{ '--progress': `${batch.progress * 3.6}deg` } as React.CSSProperties}><span>{batch.progress}%</span></div><div><StatusBadge status={batch.status} /><h3>{batch.processedFiles} / {batch.totalFiles} 个文件已处理</h3><p>{batch.succeededFiles} 个已生成知识草稿，{batch.failedFiles} 个需要处理</p></div><div className="summary-actions"><a className="secondary-button" href={`/api/imports/${batch.id}/report`}><Download size={16} />结果报告</a>{batch.failedFiles > 0 && <button className="secondary-button" onClick={() => onRetry(batch.id)}><RefreshCw size={16} />重试失败项</button>}<button className="primary-button" disabled={!canSubmit} onClick={() => onSubmit(batch.id)}><Send size={16} />提交审核</button></div></div>
+    <div className="batch-summary"><div className="radial-progress" style={{ '--progress': `${batch.progress * 3.6}deg` } as React.CSSProperties}><span>{batch.progress}%</span></div><div><StatusBadge status={batch.status} /><h3>{batch.processedFiles} / {batch.totalFiles} 个文件已处理</h3><p>{batch.succeededFiles} 个已生成知识草稿，{batch.failedFiles} 个需要处理</p></div><div className="summary-actions"><button className="secondary-button" onClick={() => api.downloadBatchReport(batch.id)}><Download size={16} />结果报告</button>{batch.failedFiles > 0 && <button className="secondary-button" onClick={() => onRetry(batch.id)}><RefreshCw size={16} />重试失败项</button>}<button className="primary-button" disabled={!canSubmit} onClick={() => onSubmit(batch.id)}><Send size={16} />提交审核</button></div></div>
     <div className="file-task-list"><div className="file-task file-task-head"><span>文件</span><span>当前阶段</span><span>提取结果</span><span>重试</span></div>{batch.files.map((file) => <FileTask key={file.id} file={file} />)}</div>
   </div>
 }

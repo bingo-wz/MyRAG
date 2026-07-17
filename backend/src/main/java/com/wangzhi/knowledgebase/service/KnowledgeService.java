@@ -12,10 +12,13 @@ import com.wangzhi.knowledgebase.dto.KnowledgeDtos.UpdateRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.View;
 import com.wangzhi.knowledgebase.repository.KnowledgeChunkRepository;
 import com.wangzhi.knowledgebase.repository.KnowledgeDocumentRepository;
+import com.wangzhi.knowledgebase.security.DomainAccessService;
+import com.wangzhi.knowledgebase.security.SecurityIdentity;
 import com.wangzhi.knowledgebase.service.ChunkingService.ChunkDraft;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,28 +38,56 @@ public class KnowledgeService {
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
     private final ChunkVectorIndex vectorIndex;
+    private final DomainAccessService domainAccessService;
+    private final SecurityIdentity securityIdentity;
 
     public KnowledgeService(KnowledgeDocumentRepository documentRepository,
                             KnowledgeChunkRepository chunkRepository,
                             ChunkingService chunkingService,
                             EmbeddingService embeddingService,
-                            ChunkVectorIndex vectorIndex) {
+                            ChunkVectorIndex vectorIndex,
+                            DomainAccessService domainAccessService,
+                            SecurityIdentity securityIdentity) {
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
         this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
         this.vectorIndex = vectorIndex;
+        this.domainAccessService = domainAccessService;
+        this.securityIdentity = securityIdentity;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<View> search(String keyword, KnowledgeStatus status, String domain, int page, int size) {
         String normalizedKeyword = blankToNull(keyword);
         String normalizedDomain = blankToNull(domain);
+        domainAccessService.checkSearch(normalizedDomain);
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
                 Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<KnowledgeDocument> result = documentRepository.search(normalizedKeyword, status, normalizedDomain, pageable);
+        List<Specification<KnowledgeDocument>> filters = new ArrayList<>();
+        if (normalizedKeyword != null) {
+            String pattern = likePattern(normalizedKeyword);
+            filters.add((root, query, criteria) -> criteria.or(
+                    criteria.like(criteria.lower(root.get("title")), pattern, '\\'),
+                    criteria.like(criteria.lower(root.get("content")), pattern, '\\')));
+        }
+        if (status != null) {
+            filters.add((root, query, criteria) -> criteria.equal(root.get("status"), status));
+        }
+        if (normalizedDomain != null) {
+            filters.add((root, query, criteria) -> criteria.equal(root.get("domain"), normalizedDomain));
+        }
+        Page<KnowledgeDocument> result = documentRepository.findAll(Specification.allOf(filters), pageable);
         return new PageResponse<>(result.getContent().stream().map(View::from).toList(), result.getNumber(),
                 result.getSize(), result.getTotalElements(), result.getTotalPages());
+    }
+
+    private String likePattern(String keyword) {
+        String escaped = keyword.toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     @Transactional(readOnly = true)
@@ -66,9 +97,10 @@ public class KnowledgeService {
 
     @Transactional
     public View create(CreateRequest request) {
+        domainAccessService.check(request.domain());
         KnowledgeDocument document = new KnowledgeDocument();
         apply(document, request.title(), request.content(), request.domain(), request.source(), request.tags());
-        document.setCreatedBy(request.createdBy().trim());
+        document.setCreatedBy(securityIdentity.currentOr(request.createdBy().trim()));
         return View.from(saveAndIndex(document, defaultBlocks(request.title(), request.content())));
     }
 
@@ -84,6 +116,7 @@ public class KnowledgeService {
     @Transactional
     public View update(Long id, UpdateRequest request) {
         KnowledgeDocument document = requireDocument(id);
+        domainAccessService.check(request.domain());
         if (document.getStatus() == KnowledgeStatus.PENDING_REVIEW || document.getStatus() == KnowledgeStatus.APPROVED) {
             throw new BusinessException(HttpStatus.CONFLICT, "待审核或已生效知识不能直接编辑，请先下线");
         }
@@ -113,7 +146,7 @@ public class KnowledgeService {
             throw new BusinessException(HttpStatus.CONFLICT, "该知识不在待审核状态");
         }
         document.setStatus(request.approved() ? KnowledgeStatus.APPROVED : KnowledgeStatus.REJECTED);
-        document.setReviewer(request.reviewer().trim());
+        document.setReviewer(securityIdentity.currentOr(request.reviewer().trim()));
         document.setReviewComment(blankToNull(request.comment()));
         KnowledgeDocument saved = documentRepository.save(document);
         vectorIndex.updateDocumentStatus(saved.getId(), saved.getStatus());
@@ -247,8 +280,10 @@ public class KnowledgeService {
     }
 
     private KnowledgeDocument requireDocument(Long id) {
-        return documentRepository.findById(id)
+        KnowledgeDocument document = documentRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "知识不存在"));
+        domainAccessService.check(document.getDomain());
+        return document;
     }
 
     private String serialize(double[] vector) {

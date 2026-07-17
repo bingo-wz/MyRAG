@@ -4,6 +4,54 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+x-app-environment: &app-environment
+  SPRING_PROFILES_ACTIVE: production
+  DATABASE_URL: jdbc:postgresql://postgres:5432/myrag
+  DATABASE_USERNAME: ${DATABASE_USERNAME}
+  DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+  DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-8}
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+  MINIO_BUCKET: ${MINIO_BUCKET:-myrag-knowledge}
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_IMPORT_TOPIC: ${KAFKA_IMPORT_TOPIC:-myrag.import.requested.v1}
+  KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-myrag-import-workers}
+  KAFKA_CONCURRENCY: ${KAFKA_CONCURRENCY:-1}
+  KAFKA_IMPORT_PARTITIONS: ${KAFKA_IMPORT_PARTITIONS:-3}
+  KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
+  OUTBOX_RETENTION_DAYS: ${OUTBOX_RETENTION_DAYS:-7}
+  MILVUS_URI: http://milvus:19530
+  MILVUS_TOKEN: ${MILVUS_TOKEN:-root:Milvus}
+  MILVUS_COLLECTION: ${MILVUS_COLLECTION:-myrag_chunks_v1}
+  EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:?请配置 OpenAI-compatible Embedding 地址}
+  EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+  EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+  EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+  CHAT_BASE_URL: ${CHAT_BASE_URL:-${EMBEDDING_BASE_URL}}
+  CHAT_API_KEY: ${CHAT_API_KEY:-${EMBEDDING_API_KEY:-}}
+  CHAT_MODEL: ${CHAT_MODEL:?请配置 OpenAI-compatible Chat 模型}
+  CHAT_MAX_TOKENS: ${CHAT_MAX_TOKENS:-800}
+  CHAT_MAX_ATTEMPTS: ${CHAT_MAX_ATTEMPTS:-2}
+  AI_HTTP_CONNECT_TIMEOUT_SECONDS: ${AI_HTTP_CONNECT_TIMEOUT_SECONDS:-3}
+  AI_HTTP_READ_TIMEOUT_SECONDS: ${AI_HTTP_READ_TIMEOUT_SECONDS:-60}
+  OAUTH2_ISSUER_URI: ${OAUTH2_ISSUER_URI:?请配置 OIDC Issuer URI}
+  OAUTH2_AUDIENCE: ${OAUTH2_AUDIENCE:-myrag-api}
+  FILE_SCAN_PROVIDER: ${FILE_SCAN_PROVIDER:?生产请配置 clamav；轻量拓扑验证可显式配置 noop}
+  CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+  CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+  FILE_SCAN_MAX_BYTES: ${FILE_SCAN_MAX_BYTES:-20971520}
+  PARSE_TIMEOUT_SECONDS: ${PARSE_TIMEOUT_SECONDS:-120}
+  MAX_FILE_SIZE: ${MAX_FILE_SIZE:-20MB}
+  MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-100MB}
+  RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-6}
+  RETRIEVAL_MIN_SCORE: ${RETRIEVAL_MIN_SCORE:-0.18}
+  CHUNK_TARGET_TOKENS: ${CHUNK_TARGET_TOKENS:-480}
+  CHUNK_OVERLAP_TOKENS: ${CHUNK_OVERLAP_TOKENS:-60}
+  VECTOR_RECONCILIATION_ENABLED: ${VECTOR_RECONCILIATION_ENABLED:-true}
+  VECTOR_RECONCILIATION_CRON: ${VECTOR_RECONCILIATION_CRON:-0 30 3 * * *}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -43,7 +91,7 @@ services:
     volumes:
       - minio-data:/data
     ports:
-      - "9001:9001"
+      - "127.0.0.1:9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -85,6 +133,7 @@ services:
       MINIO_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
       COMMON_STORAGETYPE: remote
+      COMMON_SECURITY_AUTHORIZATIONENABLED: "true"
     volumes:
       - milvus-data:/var/lib/milvus
     depends_on:
@@ -93,7 +142,7 @@ services:
       minio:
         condition: service_healthy
     ports:
-      - "19530:19530"
+      - "127.0.0.1:19530:19530"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 15s
@@ -136,6 +185,7 @@ services:
     logging: *default-logging
 
   backend:
+    image: myrag-backend:local
     build:
       context: ./backend
       args:
@@ -143,23 +193,10 @@ services:
         MAVEN_MIRROR: ${MAVEN_MIRROR:-https://repo.maven.apache.org/maven2}
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: production
-      DATABASE_URL: jdbc:postgresql://postgres:5432/myrag
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET:-myrag-knowledge}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      MILVUS_URI: http://milvus:19530
-      MILVUS_TOKEN: ${MILVUS_TOKEN:-root:Milvus}
-      MILVUS_COLLECTION: ${MILVUS_COLLECTION:-myrag_chunks_v1}
-      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:?请配置 OpenAI-compatible Embedding 地址}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
-      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m
+      <<: *app-environment
+      API_ENABLED: "true"
+      APP_IMPORT_WORKER_ENABLED: "false"
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx384m
     depends_on:
       postgres:
         condition: service_healthy
@@ -170,18 +207,61 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"]
       interval: 15s
       start_period: 45s
       timeout: 5s
       retries: 10
-    mem_limit: 768m
+    mem_limit: 640m
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  worker:
+    image: myrag-backend:local
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      API_ENABLED: "false"
+      APP_IMPORT_WORKER_ENABLED: "true"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx448m
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 704m
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  # 官方建议为 ClamAV 预留约 4GB RAM。当前电脑可改用外部 ClamAV，避免挤占主链路资源。
+  clamav:
+    image: clamav/clamav:1.4_base
+    profiles: ["security"]
+    restart: unless-stopped
+    volumes:
+      - clamav-data:/var/lib/clamav
+    mem_limit: 4096m
     logging: *default-logging
 
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
+    environment:
+      OIDC_BROWSER_AUTHORITY: ${OIDC_BROWSER_AUTHORITY:?请配置浏览器可访问的 OIDC Authority}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?请配置 OIDC SPA Client ID}
+      OIDC_SCOPES: ${OIDC_SCOPES:-myrag-api}
     depends_on:
       backend:
         condition: service_healthy
@@ -196,3 +276,4 @@ volumes:
   etcd-data:
   milvus-data:
   kafka-data:
+  clamav-data:

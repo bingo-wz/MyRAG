@@ -28,6 +28,12 @@ button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 
+.auth-loading { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--ink); background: var(--sidebar); }
+.auth-loading strong { color: #e7efec; font-size: 26px; }
+.auth-loading span { max-width: 520px; color: #91a19b; font-size: 12px; text-align: center; }
+.auth-loading button { margin-top: 12px; min-height: 36px; padding: 0 16px; color: #f5fffb; border: 1px solid #4ca78d; border-radius: 8px; background: #347f6b; }
+.auth-error strong { color: #ffd7d2; }
+
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 238px minmax(0, 1fr); }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 238px; z-index: 20; padding: 27px 18px 20px; color: #e7efec; background: var(--sidebar); display: flex; flex-direction: column; }
 .brand { border: 0; background: none; color: inherit; display: flex; align-items: center; gap: 12px; text-align: left; padding: 0 8px; }
@@ -161,7 +167,7 @@ kbd { padding: 2px 5px; border: 1px solid #dde0da; border-radius: 4px; color: #9
 .status-badge { width: max-content; padding: 4px 7px; display: inline-flex; align-items: center; gap: 5px; border-radius: 9px; color: #68746f; background: #eceeeb; font-size: 9px; white-space: nowrap; }
 .status-badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .status-approved, .status-ready, .status-submitted { color: #317765; background: #e3f1ec; }
-.status-pending_review, .status-queued, .status-processing, .status-detecting, .status-extracting, .status-validating, .status-indexing, .status-partial_ready { color: #a56d1f; background: #f7ecd9; }
+.status-pending_review, .status-queued, .status-processing, .status-scanning, .status-detecting, .status-extracting, .status-validating, .status-indexing, .status-partial_ready { color: #a56d1f; background: #f7ecd9; }
 .status-rejected, .status-failed { color: #b24e47; background: #f7e5e2; }
 .status-offline { color: #757c79; background: #e7e9e6; }
 .owner-time { display: flex; flex-direction: column; }

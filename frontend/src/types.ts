@@ -72,7 +72,7 @@ export interface BadCase {
 }
 
 export type ImportBatchStatus = 'QUEUED' | 'PROCESSING' | 'READY' | 'PARTIAL_READY' | 'SUBMITTED' | 'FAILED'
-export type ImportFileStatus = 'QUEUED' | 'DETECTING' | 'EXTRACTING' | 'VALIDATING' | 'INDEXING' | 'READY' | 'SUBMITTED' | 'FAILED'
+export type ImportFileStatus = 'QUEUED' | 'SCANNING' | 'DETECTING' | 'EXTRACTING' | 'VALIDATING' | 'INDEXING' | 'READY' | 'SUBMITTED' | 'FAILED'
 
 export interface ImportFileTask {
   id: number

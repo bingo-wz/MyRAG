@@ -8,10 +8,12 @@ import com.wangzhi.knowledgebase.dto.KnowledgeDtos.ReviewRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.UpdateRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.View;
 import com.wangzhi.knowledgebase.service.KnowledgeService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/knowledge")
+@ConditionalOnProperty(name = "app.runtime.api-enabled", havingValue = "true", matchIfMissing = true)
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
@@ -37,6 +40,7 @@ public class KnowledgeController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER','USER')")
     public PageResponse<View> search(@RequestParam(required = false) String keyword,
                                      @RequestParam(required = false) KnowledgeStatus status,
                                      @RequestParam(required = false) String domain,
@@ -46,53 +50,63 @@ public class KnowledgeController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER','USER')")
     public View get(@PathVariable Long id) {
         return knowledgeService.get(id);
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public View create(@Valid @RequestBody CreateRequest request) {
         return knowledgeService.create(request);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public View update(@PathVariable Long id, @Valid @RequestBody UpdateRequest request) {
         return knowledgeService.update(id, request);
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public View submit(@PathVariable Long id) {
         return knowledgeService.submit(id);
     }
 
     @PostMapping("/{id}/review")
+    @PreAuthorize("hasAnyRole('ADMIN','REVIEWER')")
     public View review(@PathVariable Long id, @Valid @RequestBody ReviewRequest request) {
         return knowledgeService.review(id, request);
     }
 
     @PostMapping("/{id}/offline")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public View offline(@PathVariable Long id) {
         return knowledgeService.offline(id);
     }
 
     @PostMapping("/{id}/reactivate")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public View reactivate(@PathVariable Long id) {
         return knowledgeService.reactivate(id);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         knowledgeService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/import-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public ImportResult importCsv(@RequestPart("file") MultipartFile file,
                                   @RequestParam(defaultValue = "批量导入") String createdBy) {
         return knowledgeService.importCsv(file, createdBy);
     }
 
     @GetMapping(value = "/export", produces = "text/csv")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<byte[]> export(@RequestParam(required = false) KnowledgeStatus status) {
         String filename = java.net.URLEncoder.encode("知识库导出.csv", StandardCharsets.UTF_8);
         return ResponseEntity.ok()

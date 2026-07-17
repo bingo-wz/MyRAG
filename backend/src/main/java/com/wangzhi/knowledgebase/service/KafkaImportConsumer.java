@@ -1,6 +1,6 @@
 package com.wangzhi.knowledgebase.service;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
@@ -8,7 +8,7 @@ import java.lang.management.ManagementFactory;
 import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
+@ConditionalOnExpression("'${app.kafka.enabled:false}' == 'true' and '${app.import.worker-enabled:true}' == 'true'")
 public class KafkaImportConsumer {
 
     private final ImportBatchLeaseService leaseService;

@@ -35,7 +35,7 @@ public class OpenAiCompatibleEmbeddingService implements EmbeddingService {
             @Value("${app.embedding.batch-size:32}") int batchSize,
             @Value("${app.embedding.max-attempts:3}") int maxAttempts,
             MeterRegistry meterRegistry) {
-        RestClient.Builder configured = builder.baseUrl(baseUrl);
+        RestClient.Builder configured = builder.clone().baseUrl(baseUrl);
         if (apiKey != null && !apiKey.isBlank()) {
             configured.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey.trim());
         }

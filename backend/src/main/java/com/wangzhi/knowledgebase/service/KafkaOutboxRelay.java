@@ -1,6 +1,6 @@
 package com.wangzhi.knowledgebase.service;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
+@ConditionalOnExpression("'${app.kafka.enabled:false}' == 'true' and '${app.runtime.api-enabled:true}' == 'true'")
 public class KafkaOutboxRelay {
 
     private final OutboxClaimService claimService;

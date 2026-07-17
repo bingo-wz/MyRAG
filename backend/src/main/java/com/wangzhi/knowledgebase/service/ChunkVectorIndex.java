@@ -16,4 +16,8 @@ public interface ChunkVectorIndex {
     default void updateDocumentStatus(Long documentId, KnowledgeStatus status) {
         // 仅远程向量库需要同步状态过滤字段。
     }
+
+    default IndexReconciliationReport reconcile() {
+        return IndexReconciliationReport.unsupported();
+    }
 }

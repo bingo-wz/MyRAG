@@ -9,7 +9,9 @@
 - Docker Desktop 已启动。
 - 建议 Docker 分配至少 6 GB 内存；Milvus 构建较大索引时建议 8 GB 以上。
 - Docker Disk image 上限至少 32 GB，并保持 20% 以上空闲。
-- 提供远程 OpenAI-compatible Embedding 服务，`/embeddings` 返回固定维度向量。
+- 提供远程 OpenAI-compatible Embedding 与 Chat Completion 服务。
+- 提供 OIDC/OAuth2 身份服务，并为前端注册 Authorization Code + PKCE SPA Client。
+- 正式接收文件时提供 ClamAV；可连接外部服务，或在内存充足环境启用 Compose `security` Profile。
 - 首次拉取镜像前确认有足够磁盘，避免在构建中途耗尽空间。
 
 ## 配置
@@ -25,8 +27,15 @@ cp .env.example .env
 - `EMBEDDING_BASE_URL`
 - `EMBEDDING_MODEL`
 - `EMBEDDING_DIMENSIONS`
+- `CHAT_BASE_URL`
+- `CHAT_MODEL`
+- `OAUTH2_ISSUER_URI`、`OAUTH2_AUDIENCE`
+- `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`
+- `FILE_SCAN_PROVIDER=clamav` 和 `CLAMAV_HOST`
 
 `EMBEDDING_BASE_URL` 应包含 OpenAI-compatible API 前缀。例如服务端端点为 `/v1/embeddings`，则配置为 `https://embedding.example.com/v1`。
+
+OIDC SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow。Access Token 至少包含 `aud`、`preferred_username`、`roles` 和 `domains` Claims，详见 [安全配置](SECURITY.md)。
 
 Apple Silicon 在中国大陆网络下载依赖较慢时，可在 `.env` 设置 `UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports` 和 `MAVEN_MIRROR=https://maven.aliyun.com/repository/public`。两个参数只影响后端镜像构建，默认仍使用官方源；Dockerfile 使用 BuildKit Maven 缓存，重复构建不会反复下载全部依赖。
 
@@ -39,14 +48,15 @@ docker compose --env-file .env -f docker-compose.production.yml config --quiet
 docker compose --env-file .env -f docker-compose.production.yml up --build -d
 docker compose --env-file .env -f docker-compose.production.yml ps
 docker compose --env-file .env -f docker-compose.production.yml logs -f backend
+docker compose --env-file .env -f docker-compose.production.yml logs -f worker
 ```
 
 健康检查：
 
 ```bash
-curl http://localhost:3000/api/actuator/health
-curl http://localhost:3000/api/actuator/health/readiness
-curl http://localhost:3000/api/actuator/prometheus
+curl http://localhost:3000/actuator/health/liveness
+curl http://localhost:3000/actuator/health/readiness
+curl http://localhost:3000/actuator/prometheus
 ```
 
 停止但保留数据：
@@ -66,18 +76,51 @@ docker compose --env-file .env -f docker-compose.production.yml down
 | etcd 内存上限 | 256 MB | Milvus 元数据 |
 | Milvus 内存上限 | 2.5 GB | 单机向量检索 |
 | Kafka 内存上限 | 768 MB | KRaft 单节点，JVM 最大 512 MB |
-| Backend 内存上限 | 768 MB | JVM 最大 512 MB |
+| API 内存上限 | 640 MB | JVM 最大 384 MB，不执行文件解析 |
+| Worker 内存上限 | 704 MB | JVM 最大 448 MB，单并发解析 |
+| Frontend 内存上限 | 96 MB | Nginx 与静态资源 |
 | Kafka 日志 | 24 小时 / 512 MB | 避免本机消息日志持续增长 |
 | 容器日志 | 每容器 3 × 10 MB | 限制 Docker JSON 日志 |
 | Outbox | 7 天 | 每日清理已发布事件 |
 
-内存上限适合小批次集成验证。生产吞吐提高后，应根据 Chunk 数、并发解析数和检索 QPS 单独压测，不应继续沿用这些上限。
+主拓扑内存上限合计约 5.8 GB，适合当前电脑的小批次集成验证。生产吞吐提高后，应根据 Chunk 数、并发解析数和检索 QPS 单独压测，不应继续沿用这些上限。
+
+## API 与 Worker 拆分
+
+`backend` 和 `worker` 使用同一镜像、不同运行参数：
+
+- API：`API_ENABLED=true`、`APP_IMPORT_WORKER_ENABLED=false`，提供 REST、Outbox Relay、问答和索引对账。
+- Worker：`API_ENABLED=false`、`APP_IMPORT_WORKER_ENABLED=true`、`SPRING_MAIN_WEB_APPLICATION_TYPE=none`，消费 Kafka、扫描、解析、切片和向量化，不开放端口。
+
+扩容时 API 与 Worker 应分别设置副本数。Worker 的 Kafka Consumer Group 和数据库租约共同保证重复消息不会并发处理同一批次；不要让 API 同时开启 Worker。
+
+## ClamAV 与轻量模式
+
+ClamAV 官方提示病毒库加载需要大量 RAM，2 GB 甚至可能不足，建议约 4 GB。当前 Docker 6 GB 配额无法同时容纳完整主拓扑和本地 ClamAV，推荐把 `CLAMAV_HOST` 指向另一台主机或托管扫描服务。
+
+内存充足的环境可以执行：
+
+```bash
+docker compose --profile security --env-file .env -f docker-compose.production.yml up --build -d
+```
+
+本机只验证基础设施连通性时可以显式设置 `FILE_SCAN_PROVIDER=noop`。这不会阻止服务 liveness，但 readiness 会返回 `OUT_OF_SERVICE`，且不得用于真实不可信文件。
+配置 `clamav` 后 readiness 还会执行 clamd `PING/PONG` 探测，扫描服务断开时不会误报就绪。
+
+## Milvus 自动对账
+
+- 默认每天 03:30 逐页比较 PostgreSQL 与 Milvus。
+- 自动重建缺失或内容哈希漂移的向量，修复状态并删除孤儿向量。
+- 管理员可 `POST /api/admin/index/reconcile` 手工触发，`GET` 查询最近报告。
+- 大库执行前需评估 Embedding 费用和 Milvus I/O，可用 `VECTOR_RECONCILIATION_ENABLED=false` 暂停定时任务并在维护窗口手工执行。
 
 ## MinIO 版本说明
 
 Compose 固定了可复现的 MinIO Community 镜像用于本地集成。MinIO Community 的发行和支持策略已发生变化，真正生产环境应选择组织已评审且有安全更新来源的 MinIO/AIStor 版本，或维护内部构建与补丁流程，不能长期依赖未更新的历史镜像。
 
 应用只依赖标准 MinIO Java API，替换服务端版本不需要修改业务代码。
+
+Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑定到本机回环地址。首次启动使用 Milvus 默认管理员凭据完成初始化后，应立即创建最小权限应用用户、修改默认 `root` 密码，并同步更新 `MILVUS_TOKEN`；跨主机访问必须再配置 TLS 或由受控网关终止 TLS。
 
 ## 备份
 
@@ -95,9 +138,9 @@ Compose 固定了可复现的 MinIO Community 镜像用于本地集成。MinIO C
 2. Kafka 至少 3 Broker、3 Controller，Topic 副本 3，设置最小同步副本。
 3. Milvus 使用 Cluster 模式，对象存储和 etcd 独立高可用。
 4. MinIO 使用受支持的分布式部署、TLS、KMS 和最小权限 Service Account。
-5. API 与 Import Worker 拆为独立 Deployment；解析 Worker 禁止访问公网并设置硬资源限制。
+5. API 与 Import Worker 分别部署和伸缩；解析 Worker 只允许访问 MinIO、Kafka、PostgreSQL、Milvus、ClamAV 和模型网关。
 6. 接入 Prometheus/Grafana、集中日志、Trace、告警和值班流程。
-7. 网关启用 SSO/RBAC、请求限流、上传鉴权和审计。
+7. 网关启用 TLS、请求限流和 WAF；应用层继续执行 JWT/RBAC、领域隔离和审计，不能只依赖网关。
 
 ## 上线门禁
 
@@ -105,5 +148,6 @@ Compose 固定了可复现的 MinIO Community 镜像用于本地集成。MinIO C
 - Flyway 在与生产相同大版本的 PostgreSQL 空库和升级库上验证。
 - 真实 Word/PDF/Excel/图片样本回归，包含扫描件、加密件、损坏件和超限件。
 - Kafka 重复消息、Worker 崩溃、Embedding 超时、Milvus 重启演练通过。
-- 完成病毒扫描、解析沙箱、权限模型、TLS 和备份恢复。
+- OIDC 登录、Token 过期、角色矩阵、领域越权和审计查询演练通过。
+- ClamAV EICAR、扫描服务不可用、解析超时、加密件和压缩炸弹演练通过。
 - 压测给出单文件 P95、导入吞吐、检索 P95、峰值内存和磁盘增长率。

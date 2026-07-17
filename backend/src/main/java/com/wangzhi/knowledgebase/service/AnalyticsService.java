@@ -8,6 +8,7 @@ import com.wangzhi.knowledgebase.dto.AnalyticsDtos.DailyPoint;
 import com.wangzhi.knowledgebase.dto.AnalyticsDtos.Overview;
 import com.wangzhi.knowledgebase.repository.KnowledgeDocumentRepository;
 import com.wangzhi.knowledgebase.repository.QuestionLogRepository;
+import com.wangzhi.knowledgebase.security.DomainAccessService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +25,22 @@ public class AnalyticsService {
 
     private final KnowledgeDocumentRepository documentRepository;
     private final QuestionLogRepository logRepository;
+    private final DomainAccessService domainAccessService;
 
-    public AnalyticsService(KnowledgeDocumentRepository documentRepository, QuestionLogRepository logRepository) {
+    public AnalyticsService(KnowledgeDocumentRepository documentRepository,
+                            QuestionLogRepository logRepository,
+                            DomainAccessService domainAccessService) {
         this.documentRepository = documentRepository;
         this.logRepository = logRepository;
+        this.domainAccessService = domainAccessService;
     }
 
     @Transactional(readOnly = true)
     public Overview overview() {
-        List<QuestionLog> logs = logRepository.findByCreatedAtAfterOrderByCreatedAtAsc(LocalDate.now().minusDays(6).atStartOfDay());
+        List<QuestionLog> logs = logRepository
+                .findByCreatedAtAfterOrderByCreatedAtAsc(LocalDate.now().minusDays(6).atStartOfDay()).stream()
+                .filter(log -> domainAccessService.allowed(log.getDomain()))
+                .toList();
         long accepted = logs.stream().filter(log -> Boolean.TRUE.equals(log.getAccepted())).count();
         long rated = logs.stream().filter(log -> log.getAccepted() != null).count();
         double acceptanceRate = rated == 0 ? 0 : accepted * 100.0 / rated;
@@ -51,16 +59,21 @@ public class AnalyticsService {
             trend.add(new DailyPoint(date, daily.size(), dailyRated == 0 ? 0 : round(dailyAccepted * 100.0 / dailyRated)));
         }
 
-        Map<String, Long> distribution = documentRepository.findAll().stream()
+        List<KnowledgeDocument> documents = documentRepository.findAll().stream()
+                .filter(document -> domainAccessService.allowed(document.getDomain()))
+                .toList();
+        Map<String, Long> distribution = documents.stream()
                 .collect(Collectors.groupingBy(KnowledgeDocument::getDomain, LinkedHashMap::new, Collectors.counting()));
-        return new Overview(documentRepository.count(), documentRepository.countByStatus(KnowledgeStatus.APPROVED),
-                documentRepository.countByStatus(KnowledgeStatus.PENDING_REVIEW), logs.size(), round(acceptanceRate),
+        return new Overview(documents.size(), documents.stream().filter(document -> document.getStatus() == KnowledgeStatus.APPROVED).count(),
+                documents.stream().filter(document -> document.getStatus() == KnowledgeStatus.PENDING_REVIEW).count(),
+                logs.size(), round(acceptanceRate),
                 round(averageConfidence), averageLatency, badCases, trend, distribution);
     }
 
     @Transactional(readOnly = true)
     public List<BadCaseView> badCases() {
         return logRepository.findByBadCaseTrueOrderByCreatedAtDesc().stream()
+                .filter(log -> domainAccessService.allowed(log.getDomain()))
                 .map(log -> new BadCaseView(log.getTraceId(), log.getQuestion(), log.getAnswer(),
                         round(log.getConfidence() * 100), log.getLatencyMs(), log.getBadReason(),
                         log.getSourceSnapshot(), log.getCreatedAt()))

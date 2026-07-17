@@ -73,6 +73,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         for (int i = 0; i < 78; i++) {
             QuestionLog log = new QuestionLog();
             log.setTraceId("DEMO%012d".formatted(i));
+            log.setAskedBy("demo-user");
+            log.setDomain("演示数据");
             log.setQuestion(questions[i % questions.length]);
             log.setAnswer(i % 11 == 0 ? "当前知识不足，暂时无法给出可靠结论。" : "已根据知识库返回对应规则与办理路径。详情请核对引用来源。");
             log.setConfidence(i % 11 == 0 ? 0.42 : 0.71 + random.nextDouble() * 0.24);
@@ -82,6 +84,8 @@ public class DemoDataInitializer implements ApplicationRunner {
             log.setBadCase(!accepted || log.getConfidence() < 0.55);
             log.setBadReason(accepted ? null : (i % 2 == 0 ? "回答缺少适用范围" : "召回了过期知识"));
             log.setSourceSnapshot("[]");
+            log.setModelName("demo-extractive");
+            log.setPromptVersion("demo-v1");
             log.setCreatedAt(LocalDateTime.now().minusDays(6 - i % 7).minusMinutes(i * 13L));
             logRepository.save(log);
         }
