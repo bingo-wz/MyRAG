@@ -14,7 +14,8 @@ public class DevelopmentSecurityConfig {
     @Bean
     SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())
+                // 开发 API 没有 Cookie 身份，保留默认 CSRF 机制并仅忽略 API 路径。
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
                 .build();

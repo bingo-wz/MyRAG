@@ -29,7 +29,8 @@ public class ProductionSecurityConfig {
     @Bean
     SecurityFilterChain productionSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())
+                // API 只接受 Bearer Token，不使用浏览器 Cookie 或服务端 Session。
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
