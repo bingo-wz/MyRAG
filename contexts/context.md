@@ -17,7 +17,7 @@
 - 默认 Profile 保留 H2 + 文件系统 + Hash Embedding + Inline Vector，服务于低成本开发测试。
 - `production` Profile 强制启用 PostgreSQL + Kafka + MinIO + Milvus + 语义 Embedding。
 - 单机 Compose 用于完整拓扑集成和容量评估，不宣称具备多副本高可用能力。
-- 对外生产上线仍需部署级 SSO/RBAC、TLS、病毒扫描、解析沙箱、备份恢复和多节点基础设施。
+- 对外生产上线仍需部署级 SSO/RBAC、TLS、解析沙箱、备份恢复和多节点基础设施。
 
 ## 开发规范
 

@@ -8,9 +8,7 @@ import com.wangzhi.knowledgebase.dto.KnowledgeDtos.CreateRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.View;
 import com.wangzhi.knowledgebase.repository.ImportBatchRepository;
 import com.wangzhi.knowledgebase.repository.ImportFileTaskRepository;
-import com.wangzhi.knowledgebase.security.FileSecurityScanner;
 import com.wangzhi.knowledgebase.service.TextExtractionService.ExtractionResult;
-import com.wangzhi.knowledgebase.storage.ObjectStorageService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -18,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.InputStream;
 import java.util.List;
 
 @Service
@@ -30,8 +27,6 @@ public class ImportProcessor {
     private final ImportFileTaskRepository fileRepository;
     private final TimedTextExtractionService extractionService;
     private final KnowledgeService knowledgeService;
-    private final ObjectStorageService storageService;
-    private final FileSecurityScanner fileSecurityScanner;
     private final ImportBatchLeaseService leaseService;
     private final Counter successCounter;
     private final Counter failureCounter;
@@ -41,16 +36,12 @@ public class ImportProcessor {
                            ImportFileTaskRepository fileRepository,
                            TimedTextExtractionService extractionService,
                            KnowledgeService knowledgeService,
-                           ObjectStorageService storageService,
-                           FileSecurityScanner fileSecurityScanner,
                            ImportBatchLeaseService leaseService,
                            MeterRegistry meterRegistry) {
         this.batchRepository = batchRepository;
         this.fileRepository = fileRepository;
         this.extractionService = extractionService;
         this.knowledgeService = knowledgeService;
-        this.storageService = storageService;
-        this.fileSecurityScanner = fileSecurityScanner;
         this.leaseService = leaseService;
         this.successCounter = meterRegistry.counter("myrag.import.files", "result", "success");
         this.failureCounter = meterRegistry.counter("myrag.import.files", "result", "failure");
@@ -76,10 +67,6 @@ public class ImportProcessor {
     private void processOne(ImportBatch batch, ImportFileTask task) {
         long startedAt = System.nanoTime();
         try {
-            update(task, ImportFileStatus.SCANNING);
-            try (InputStream input = storageService.open(task.getStorageKey())) {
-                fileSecurityScanner.scan(input, task.getOriginalName());
-            }
             update(task, ImportFileStatus.DETECTING);
             update(task, ImportFileStatus.EXTRACTING);
             ExtractionResult result = extractionService.extract(task.getStorageKey(), task.getOriginalName());

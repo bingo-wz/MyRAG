@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingState, Toast } from '../components/Ui'
 import type { ImportBatch, ImportFileTask } from '../types'
 
 const processingStatuses = new Set(['QUEUED', 'PROCESSING'])
-const fileSteps = ['QUEUED', 'SCANNING', 'DETECTING', 'EXTRACTING', 'VALIDATING', 'INDEXING', 'READY']
+const fileSteps = ['QUEUED', 'DETECTING', 'EXTRACTING', 'VALIDATING', 'INDEXING', 'READY']
 
 export function ImportPage() {
   const [batches, setBatches] = useState<ImportBatch[]>([])

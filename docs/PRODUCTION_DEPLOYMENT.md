@@ -11,7 +11,6 @@
 - Docker Disk image 上限至少 32 GB，并保持 20% 以上空闲。
 - 提供远程 OpenAI-compatible Embedding 与 Chat Completion 服务。
 - 提供 OIDC/OAuth2 身份服务，并为前端注册 Authorization Code + PKCE SPA Client。
-- 正式接收文件时提供 ClamAV；可连接外部服务，或在内存充足环境启用 Compose `security` Profile。
 - 首次拉取镜像前确认有足够磁盘，避免在构建中途耗尽空间。
 
 ## 配置
@@ -31,7 +30,6 @@ cp .env.example .env
 - `CHAT_MODEL`
 - `OAUTH2_ISSUER_URI`、`OAUTH2_AUDIENCE`
 - `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`
-- `FILE_SCAN_PROVIDER=clamav` 和 `CLAMAV_HOST`
 
 `EMBEDDING_BASE_URL` 应包含 OpenAI-compatible API 前缀。例如服务端端点为 `/v1/embeddings`，则配置为 `https://embedding.example.com/v1`。
 
@@ -90,22 +88,9 @@ docker compose --env-file .env -f docker-compose.production.yml down
 `backend` 和 `worker` 使用同一镜像、不同运行参数：
 
 - API：`API_ENABLED=true`、`APP_IMPORT_WORKER_ENABLED=false`，提供 REST、Outbox Relay、问答和索引对账。
-- Worker：`API_ENABLED=false`、`APP_IMPORT_WORKER_ENABLED=true`、`SPRING_MAIN_WEB_APPLICATION_TYPE=none`，消费 Kafka、扫描、解析、切片和向量化，不开放端口。
+- Worker：`API_ENABLED=false`、`APP_IMPORT_WORKER_ENABLED=true`、`SPRING_MAIN_WEB_APPLICATION_TYPE=none`，消费 Kafka、解析、切片和向量化，不开放端口。
 
 扩容时 API 与 Worker 应分别设置副本数。Worker 的 Kafka Consumer Group 和数据库租约共同保证重复消息不会并发处理同一批次；不要让 API 同时开启 Worker。
-
-## ClamAV 与轻量模式
-
-ClamAV 官方提示病毒库加载需要大量 RAM，2 GB 甚至可能不足，建议约 4 GB。当前 Docker 6 GB 配额无法同时容纳完整主拓扑和本地 ClamAV，推荐把 `CLAMAV_HOST` 指向另一台主机或托管扫描服务。
-
-内存充足的环境可以执行：
-
-```bash
-docker compose --profile security --env-file .env -f docker-compose.production.yml up --build -d
-```
-
-本机只验证基础设施连通性时可以显式设置 `FILE_SCAN_PROVIDER=noop`。这不会阻止服务 liveness，但 readiness 会返回 `OUT_OF_SERVICE`，且不得用于真实不可信文件。
-配置 `clamav` 后 readiness 还会执行 clamd `PING/PONG` 探测，扫描服务断开时不会误报就绪。
 
 ## Milvus 自动对账
 
@@ -138,7 +123,7 @@ Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑
 2. Kafka 至少 3 Broker、3 Controller，Topic 副本 3，设置最小同步副本。
 3. Milvus 使用 Cluster 模式，对象存储和 etcd 独立高可用。
 4. MinIO 使用受支持的分布式部署、TLS、KMS 和最小权限 Service Account。
-5. API 与 Import Worker 分别部署和伸缩；解析 Worker 只允许访问 MinIO、Kafka、PostgreSQL、Milvus、ClamAV 和模型网关。
+5. API 与 Import Worker 分别部署和伸缩；解析 Worker 只允许访问 MinIO、Kafka、PostgreSQL、Milvus 和模型网关。
 6. 接入 Prometheus/Grafana、集中日志、Trace、告警和值班流程。
 7. 网关启用 TLS、请求限流和 WAF；应用层继续执行 JWT/RBAC、领域隔离和审计，不能只依赖网关。
 
@@ -149,5 +134,5 @@ Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑
 - 真实 Word/PDF/Excel/图片样本回归，包含扫描件、加密件、损坏件和超限件。
 - Kafka 重复消息、Worker 崩溃、Embedding 超时、Milvus 重启演练通过。
 - OIDC 登录、Token 过期、角色矩阵、领域越权和审计查询演练通过。
-- ClamAV EICAR、扫描服务不可用、解析超时、加密件和压缩炸弹演练通过。
+- 解析超时、伪造扩展名、加密件、损坏件和压缩炸弹演练通过。
 - 压测给出单文件 P95、导入吞吐、检索 P95、峰值内存和磁盘增长率。

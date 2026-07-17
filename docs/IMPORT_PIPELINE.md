@@ -21,8 +21,7 @@ flowchart LR
     D --> E["Outbox Relay"]
     E --> F["Kafka"]
     F --> G["数据库租约领取"]
-    G --> H["ClamAV 流式病毒扫描"]
-    H --> I["Tika MIME 检测"]
+    G --> I["Tika MIME 检测"]
     I --> J["隔离进程结构解析 / OCR"]
     J --> K["正文质量校验"]
     K --> L["Token + 结构切片"]
@@ -49,13 +48,12 @@ flowchart LR
 文件状态：
 
 1. `QUEUED`
-2. `SCANNING`
-3. `DETECTING`
-4. `EXTRACTING`
-5. `VALIDATING`
-6. `INDEXING`
-7. `READY`
-8. `SUBMITTED`
+2. `DETECTING`
+3. `EXTRACTING`
+4. `VALIDATING`
+5. `INDEXING`
+6. `READY`
+7. `SUBMITTED`
 
 文件任一阶段异常进入 `FAILED` 并保存最深层根因；同批其他文件继续处理。
 
@@ -89,7 +87,6 @@ flowchart LR
 
 ## 4. 解析与 OCR
 
-- Worker 从 MinIO 打开对象流后先使用 ClamAV `zINSTREAM` 协议扫描，命中病毒、扫描服务异常或超限均按失败关闭，不进入解析。
 - `AutoDetectParser` 统一路由 Office、PDF、文本和图片解析器。
 - 自定义 SAX Handler 将 XHTML 输出映射为 `ParsedBlock`：`heading`、`paragraph`、`list-item`、`table-row`。
 - Block 保存 `pageNumber`、`headingPath` 和 `locator`，用于引用定位。
@@ -133,10 +130,10 @@ Tika 与 Tesseract 已覆盖常见格式。生产 Compose 已将 API 和解析 W
 
 - 扩展名、MIME、文件头三重检测
 - 文件大小、页数、压缩展开比、提取字符数和处理时间限制
-- ClamAV/商业杀毒与隔离解析容器（已实现 ClamAV 协议和 API/Worker 拆分）
+- API/Worker 进程隔离、只读根文件系统、非 root 和解析硬超时
 - 禁止宏执行、外部链接加载和嵌入对象执行
 - MinIO TLS、最小权限凭证、服务端加密和对象版本策略
 - PII 检测、敏感标签、操作审计和访问鉴权
 - PostgreSQL、MinIO、Kafka、Milvus 的备份与恢复演练
 
-仓库已经实现格式/MIME/大小/字符上限、内容去重、ClamAV 扫描、解析超时、任务租约、恢复、OIDC/RBAC/领域隔离和跨组件自动对账。正式上线仍需提供真实 IdP、ClamAV、模型网关、TLS/KMS、PII 策略，并完成恶意样本和故障演练。
+仓库已经实现格式/MIME/大小/字符上限、内容去重、解析超时、任务租约、恢复、OIDC/RBAC/领域隔离和跨组件自动对账。正式上线仍需提供真实 IdP、模型网关、TLS/KMS、PII 策略，并完成损坏件、超限件和故障演练；若开放公网不可信文件上传，应在网关或独立沙箱层补充组织认可的恶意文件检测。

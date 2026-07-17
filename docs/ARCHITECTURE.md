@@ -17,8 +17,7 @@ flowchart TB
     OUTBOX --> KAFKA["Kafka"]
     KAFKA --> LEASE["独立租约 Import Worker"]
     LEASE --> MINIO
-    LEASE --> AV["ClamAV INSTREAM"]
-    AV --> TIKA["Tika / Tesseract + 硬超时"]
+    LEASE --> TIKA["Tika / Tesseract + 硬超时"]
     TIKA --> CHUNK["结构化 Token Chunk"]
     CHUNK --> EMB["OpenAI-compatible Embedding"]
     EMB --> MILVUS[("Milvus")]
@@ -120,7 +119,6 @@ stateDiagram-v2
 | `RetrievalBackend` | Java 内存扫描 | Milvus + PostgreSQL 混合召回 |
 | 数据库 | H2 自动建表 | PostgreSQL + Flyway |
 | 认证 | 关闭 | OIDC PKCE + JWT Resource Server |
-| 文件扫描 | Noop | ClamAV `INSTREAM` |
 
 ## 可观测性
 
@@ -131,7 +129,7 @@ stateDiagram-v2
 - `myrag.chat.request.duration{model=...}`：Chat Completion 耗时。
 - `myrag.chat.requests{result=success|failure|fallback}`：生成结果和降级计数。
 - `/actuator/health`：基础健康状态。
-- `/actuator/health/readiness`：生产就绪状态；非语义 Embedding、非生成式 Chat、Noop 文件扫描或 JWT 关闭都会使检查失败。
+- `/actuator/health/readiness`：生产就绪状态；非语义 Embedding、非生成式 Chat 或 JWT 关闭都会使检查失败。
 - `/actuator/prometheus`：Prometheus 拉取入口。
 
 建议告警：Kafka 消费延迟、Outbox PENDING 数、租约超时数、导入失败率、Embedding P95、Milvus 搜索 P95、PostgreSQL 连接池和磁盘使用率。

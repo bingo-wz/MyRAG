@@ -2,7 +2,6 @@ package com.wangzhi.knowledgebase.domain;
 
 public enum ImportFileStatus {
     QUEUED,
-    SCANNING,
     DETECTING,
     EXTRACTING,
     VALIDATING,

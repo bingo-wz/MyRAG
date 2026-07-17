@@ -38,10 +38,6 @@ x-app-environment: &app-environment
   AI_HTTP_READ_TIMEOUT_SECONDS: ${AI_HTTP_READ_TIMEOUT_SECONDS:-60}
   OAUTH2_ISSUER_URI: ${OAUTH2_ISSUER_URI:?请配置 OIDC Issuer URI}
   OAUTH2_AUDIENCE: ${OAUTH2_AUDIENCE:-myrag-api}
-  FILE_SCAN_PROVIDER: ${FILE_SCAN_PROVIDER:?生产请配置 clamav；轻量拓扑验证可显式配置 noop}
-  CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
-  CLAMAV_PORT: ${CLAMAV_PORT:-3310}
-  FILE_SCAN_MAX_BYTES: ${FILE_SCAN_MAX_BYTES:-20971520}
   PARSE_TIMEOUT_SECONDS: ${PARSE_TIMEOUT_SECONDS:-120}
   MAX_FILE_SIZE: ${MAX_FILE_SIZE:-20MB}
   MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-100MB}
@@ -244,16 +240,6 @@ services:
       - no-new-privileges:true
     logging: *default-logging
 
-  # 官方建议为 ClamAV 预留约 4GB RAM。当前电脑可改用外部 ClamAV，避免挤占主链路资源。
-  clamav:
-    image: clamav/clamav:1.4_base
-    profiles: ["security"]
-    restart: unless-stopped
-    volumes:
-      - clamav-data:/var/lib/clamav
-    mem_limit: 4096m
-    logging: *default-logging
-
   frontend:
     build:
       context: ./frontend
@@ -276,4 +262,3 @@ volumes:
   etcd-data:
   milvus-data:
   kafka-data:
-  clamav-data:

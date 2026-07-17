@@ -19,7 +19,7 @@
 | Tesseract | Host 未安装 | Docker 后端镜像已经内置，不要求 Host 安装 |
 | Kafka / MinIO / Milvus | Host 未安装 | 统一通过 Docker Compose，避免污染 Host |
 | 本地 AI 模型 | 未安装 | 生产 Profile 采用远程 Embedding 与 Chat Completion，节约磁盘 |
-| OIDC / ClamAV | Host 未安装 | OIDC 使用外部 IdP；ClamAV 建议外部部署，避免挤占 6 GB Docker 内存 |
+| OIDC | Host 未安装 | 使用外部托管 IdP，避免增加本机服务和运维负担 |
 
 ## 已采用的适配方案
 
@@ -29,7 +29,6 @@
 - Milvus 只存向量和筛选字段，正文不重复存储。
 - Kafka 日志、Outbox 和 Docker JSON 日志都有保留上限。
 - API 与 Worker 已拆成独立进程，主拓扑容器内存上限合计约 5.8 GB。
-- ClamAV 官方建议约 4 GB RAM，因此不计入本机默认主拓扑；本机应连接外部 ClamAV。
 - 保留零依赖开发 Profile，日常改 UI/业务逻辑时无需启动完整基础设施。
 
 ## 实机联调结果
@@ -48,9 +47,9 @@
 
 本次改造还完成了以下实机验证：
 
-- Java 21 下执行 `mvn clean verify`，21 个测试全部通过；Testcontainers 在 PostgreSQL 17.10 上真实执行 Flyway V1 到 V2，并覆盖 PostgreSQL 动态知识搜索，未跳过测试。
+- Java 21 下执行 `mvn clean verify`，20 个测试全部通过；Testcontainers 在 PostgreSQL 17.10 上真实执行 Flyway V1 到 V3，并覆盖旧扫描状态迁移和 PostgreSQL 动态知识搜索，未跳过测试。
 - 前端 TypeScript 检查与 Vite 生产构建通过，产物 JavaScript gzip 后约 93 KB。
-- 生产 Compose 主配置与 `security` Profile 均通过解析校验。
+- 生产 Compose 主配置通过解析校验。
 - 后端镜像以 UID/GID `10001`、只读根文件系统、`cap_drop=ALL` 和 640 MB 上限启动，健康检查与知识 API 均正常。
 - 当前后端镜像约 286 MB、前端镜像约 26 MB；后端演示数据启动后实测内存约 419 MiB。
 - PostgreSQL、Kafka、MinIO、etcd、Milvus 五个基础设施容器全部达到 `healthy`；Milvus 无凭据访问返回 401，应用凭据可正常建集合和执行混合检索问答。
@@ -63,7 +62,7 @@
 docker compose up -d
 ```
 
-验证生产链路时再启动主拓扑，并连接远程模型、OIDC 和外部 ClamAV：
+验证生产链路时再启动主拓扑，并连接远程模型和 OIDC：
 
 ```bash
 docker compose down
@@ -80,14 +79,13 @@ docker compose --env-file .env -f docker-compose.production.yml up -d
 - 小到中等批次的 Word/PDF/Excel/图片导入
 - Kafka 故障恢复、Milvus 检索和 MinIO 去重验证
 - 前后端开发、测试和面试演示
-- OIDC/JWT 权限、ClamAV 协议、API/Worker 隔离和索引对账功能验证
+- OIDC/JWT 权限、API/Worker 隔离和索引对账功能验证
 
 这台电脑不适合承担：
 
 - 千万级 Chunk 的全量索引
 - 多副本 Kafka/Milvus/MinIO 高可用模拟
 - 本地大模型与完整基础设施同时推理
-- 本地 ClamAV 4 GB Profile 与 6 GB 主拓扑同时运行
 - 长时间生产流量或高并发压测
 
 真正的千万级生产应使用独立服务器或云服务；本机只作为开发与单节点集成环境。

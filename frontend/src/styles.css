@@ -167,7 +167,7 @@ kbd { padding: 2px 5px; border: 1px solid #dde0da; border-radius: 4px; color: #9
 .status-badge { width: max-content; padding: 4px 7px; display: inline-flex; align-items: center; gap: 5px; border-radius: 9px; color: #68746f; background: #eceeeb; font-size: 9px; white-space: nowrap; }
 .status-badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .status-approved, .status-ready, .status-submitted { color: #317765; background: #e3f1ec; }
-.status-pending_review, .status-queued, .status-processing, .status-scanning, .status-detecting, .status-extracting, .status-validating, .status-indexing, .status-partial_ready { color: #a56d1f; background: #f7ecd9; }
+.status-pending_review, .status-queued, .status-processing, .status-detecting, .status-extracting, .status-validating, .status-indexing, .status-partial_ready { color: #a56d1f; background: #f7ecd9; }
 .status-rejected, .status-failed { color: #b24e47; background: #f7e5e2; }
 .status-offline { color: #757c79; background: #e7e9e6; }
 .owner-time { display: flex; flex-direction: column; }

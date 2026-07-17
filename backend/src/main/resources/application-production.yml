@@ -57,14 +57,6 @@ app:
   security:
     enabled: true
     audit-enabled: true
-    file-scan:
-      provider: ${FILE_SCAN_PROVIDER:clamav}
-      max-bytes: ${FILE_SCAN_MAX_BYTES:20971520}
-      clamav:
-        host: ${CLAMAV_HOST:clamav}
-        port: ${CLAMAV_PORT:3310}
-        connect-timeout-ms: 3000
-        read-timeout-ms: 30000
   readiness:
     enabled: true
   storage:

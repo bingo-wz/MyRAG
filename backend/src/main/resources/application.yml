@@ -44,8 +44,6 @@ app:
   security:
     enabled: false
     audit-enabled: false
-    file-scan:
-      provider: noop
   import:
     storage-path: ./data/imports
     max-files-per-batch: 50
