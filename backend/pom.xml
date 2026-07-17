@@ -21,7 +21,7 @@
         <java.version>21</java.version>
         <tika.version>3.3.1</tika.version>
         <minio.version>9.0.1</minio.version>
-        <milvus.version>2.6.18</milvus.version>
+        <milvus.version>3.0.4</milvus.version>
     </properties>
 
     <dependencies>
