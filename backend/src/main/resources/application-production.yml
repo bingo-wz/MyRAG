@@ -4,7 +4,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${OAUTH2_ISSUER_URI}
-          audiences: ${OAUTH2_AUDIENCE:myrag-api}
+          audiences: ${OAUTH2_AUDIENCE}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/myrag}
     driver-class-name: org.postgresql.Driver
@@ -57,6 +57,10 @@ app:
   security:
     enabled: true
     audit-enabled: true
+    claims:
+      principal: ${OIDC_PRINCIPAL_CLAIM:preferred_username}
+      roles: ${OIDC_ROLES_CLAIM:roles}
+      domains: ${OIDC_DOMAINS_CLAIM:domains}
   readiness:
     enabled: true
   storage:
@@ -86,19 +90,20 @@ app:
     parse-timeout-seconds: ${PARSE_TIMEOUT_SECONDS:120}
   embedding:
     provider: openai-compatible
-    base-url: ${EMBEDDING_BASE_URL}
-    api-key: ${EMBEDDING_API_KEY:}
-    model: ${EMBEDDING_MODEL:bge-m3}
+    base-url: ${EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}
+    api-key: ${EMBEDDING_API_KEY:${SILICONFLOW_API_KEY}}
+    model: ${EMBEDDING_MODEL:BAAI/bge-m3}
     dimensions: ${EMBEDDING_DIMENSIONS:1024}
     batch-size: ${EMBEDDING_BATCH_SIZE:32}
     max-attempts: 3
   chat:
     provider: openai-compatible
-    base-url: ${CHAT_BASE_URL:${EMBEDDING_BASE_URL}}
-    api-key: ${CHAT_API_KEY:${EMBEDDING_API_KEY:}}
-    model: ${CHAT_MODEL}
+    base-url: ${CHAT_BASE_URL:${EMBEDDING_BASE_URL:https://api.siliconflow.cn/v1}}
+    api-key: ${CHAT_API_KEY:${EMBEDDING_API_KEY:${SILICONFLOW_API_KEY}}}
+    model: ${CHAT_MODEL:Qwen/Qwen3-8B}
     max-tokens: ${CHAT_MAX_TOKENS:800}
     max-attempts: ${CHAT_MAX_ATTEMPTS:2}
+    enable-thinking: ${CHAT_ENABLE_THINKING:false}
   vector:
     store: milvus
     reconciliation:

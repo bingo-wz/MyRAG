@@ -19,7 +19,7 @@ flowchart TB
     LEASE --> MINIO
     LEASE --> TIKA["Tika / Tesseract + 硬超时"]
     TIKA --> CHUNK["结构化 Token Chunk"]
-    CHUNK --> EMB["OpenAI-compatible Embedding"]
+    CHUNK --> EMB["SiliconFlow Embedding"]
     EMB --> MILVUS[("Milvus")]
     CHUNK --> PG
 
@@ -27,7 +27,7 @@ flowchart TB
     RET --> EMB
     RET --> MILVUS
     RET --> PG
-    RET --> LLM["OpenAI-compatible Chat Completion"]
+    RET --> LLM["SiliconFlow Chat Completion"]
     LLM --> QA
     AN --> PG
 ```
@@ -105,7 +105,7 @@ stateDiagram-v2
 7. 输出必须包含有效来源编号；无效引用、模型超时或网关错误会重试并自动降级为抽取式答案。
 8. 回答保存模型、Prompt 版本、Token、引用、置信度、延迟与 Trace ID，负反馈进入 Bad Case。
 
-开发 Profile 使用抽取式答案；生产 Profile 已实现 OpenAI-compatible Chat Completion、引用一致性检查、Token 记录、超时重试和可用性降级。敏感信息识别和模型网关级熔断仍应由企业 AI Gateway 承担。
+开发 Profile 使用抽取式答案；生产 Profile 通过 OpenAI-compatible 适配器调用 SiliconFlow，实现引用一致性检查、Token 记录、超时重试和可用性降级。敏感信息识别和模型网关级熔断仍应由企业 AI Gateway 承担。
 
 ## 开发与生产实现映射
 
@@ -113,8 +113,8 @@ stateDiagram-v2
 | --- | --- | --- |
 | `ObjectStorageService` | 内容寻址文件系统 | MinIO |
 | `ImportDispatch` | 数据库兜底扫描 | Kafka Transactional Outbox |
-| `EmbeddingService` | Hash Embedding | OpenAI-compatible Embedding |
-| `ChatService` | 带来源抽取式答案 | OpenAI-compatible Chat + 引用校验 + 降级 |
+| `EmbeddingService` | Hash Embedding | SiliconFlow `BAAI/bge-m3` |
+| `ChatService` | 带来源抽取式答案 | SiliconFlow `Qwen/Qwen3-8B` + 引用校验 + 降级 |
 | `ChunkVectorIndex` | Chunk 内联向量 | Milvus |
 | `RetrievalBackend` | Java 内存扫描 | Milvus + PostgreSQL 混合召回 |
 | 数据库 | H2 自动建表 | PostgreSQL + Flyway |

@@ -4,6 +4,8 @@ interface RuntimeConfig {
   oidcAuthority?: string
   oidcClientId?: string
   oidcScopes?: string
+  oidcPrincipalClaim?: string
+  oidcRolesClaim?: string
 }
 
 declare global {
@@ -21,6 +23,8 @@ export interface AuthSession {
 const runtime = window.MYRAG_CONFIG ?? {}
 const authority = runtime.oidcAuthority?.trim() ?? ''
 const clientId = runtime.oidcClientId?.trim() ?? ''
+const principalClaim = runtime.oidcPrincipalClaim?.trim() || 'preferred_username'
+const rolesClaim = runtime.oidcRolesClaim?.trim() || 'roles'
 const configured = Boolean(authority && clientId)
 
 const settings: UserManagerSettings | undefined = configured ? {
@@ -38,13 +42,42 @@ const manager = settings ? new UserManager(settings) : undefined
 
 function session(user: User): AuthSession {
   const profile = user.profile as Record<string, unknown>
-  const displayName = String(profile.name ?? profile.preferred_username ?? profile.email ?? '已登录用户')
-  const roles = Array.isArray(profile.roles) ? profile.roles.map(String) : []
+  const displayName = String(resolveClaim(profile, principalClaim)
+    ?? profile.name ?? profile.preferred_username ?? profile.email ?? user.profile.sub ?? '已登录用户')
+  const roles = claimValues(resolveClaim(profile, rolesClaim))
+    .map(role => role.replace(/^ROLE_/i, '').toUpperCase())
   return {
     authenticated: true,
     displayName,
-    roleLabel: roles.includes('ADMIN') ? '系统管理员' : roles.includes('REVIEWER') ? '知识审核员' : '知识用户',
+    roleLabel: roles.includes('ADMIN') ? '系统管理员'
+      : roles.includes('REVIEWER') ? '知识审核员'
+        : roles.includes('KNOWLEDGE_OPERATOR') ? '知识运营员' : '知识用户',
   }
+}
+
+function resolveClaim(profile: Record<string, unknown>, claimPath: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(profile, claimPath)) {
+    return profile[claimPath]
+  }
+  let current: unknown = profile
+  for (const segment of claimPath.split('.')) {
+    if (!current || typeof current !== 'object' || !(segment in current)) return undefined
+    current = (current as Record<string, unknown>)[segment]
+  }
+  return current
+}
+
+function claimValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (item && typeof item === 'object') {
+        const role = item as Record<string, unknown>
+        return String(role.code ?? role.name ?? '')
+      }
+      return String(item)
+    }).filter(Boolean)
+  }
+  return typeof value === 'string' ? value.split(/[,\s]+/).filter(Boolean) : []
 }
 
 async function initialize(): Promise<AuthSession> {

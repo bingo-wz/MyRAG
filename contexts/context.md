@@ -10,7 +10,8 @@
 - Milvus：生产稠密向量索引与 COSINE/HNSW 检索。
 - MinIO：原文件对象存储，SHA-256 内容寻址去重；同时作为单机 Milvus 的对象存储后端。
 - PostgreSQL：知识元数据、Chunk 正文、任务状态、Outbox、问答日志和 `pg_trgm` 词法索引。
-- OpenAI-compatible Embedding：生产语义向量，优先使用远程服务以减少本机存储。
+- SiliconFlow：生产 Chat 与 Embedding 托管服务，默认使用 `Qwen/Qwen3-8B` 和 `BAAI/bge-m3`，避免本机模型存储。
+- Authing 免费版：生产 OIDC 托管服务，使用 Authorization Code + PKCE；JWT Claim 名支持环境变量映射。
 
 ## 运行边界
 

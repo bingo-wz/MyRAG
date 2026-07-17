@@ -7,12 +7,14 @@ import com.wangzhi.knowledgebase.service.RetrievedChunk;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -23,6 +25,9 @@ class OpenAiCompatibleChatServiceTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("http://chat.test/v1/chat/completions"))
+                .andExpect(content().json("""
+                        {"model":"test-chat","temperature":0.1,"max_tokens":256,"enable_thinking":false}
+                        """, JsonCompareMode.LENIENT))
                 .andRespond(withSuccess("""
                         {"choices":[{"message":{"role":"assistant","content":"系统使用 Kafka 处理导入事件。[S1]"}}],
                          "usage":{"prompt_tokens":120,"completion_tokens":18,"total_tokens":138}}
@@ -56,7 +61,7 @@ class OpenAiCompatibleChatServiceTest {
 
     private OpenAiCompatibleChatService service(RestClient.Builder builder) {
         return new OpenAiCompatibleChatService(builder, new GroundedAnswerBuilder(),
-                "http://chat.test/v1", "", "test-chat", 256, 1, new SimpleMeterRegistry());
+                "http://chat.test/v1", "", "test-chat", 256, 1, false, new SimpleMeterRegistry());
     }
 
     private RetrievedChunk chunk() {

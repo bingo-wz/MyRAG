@@ -24,7 +24,7 @@
 ## 已采用的适配方案
 
 - 不安装本地 Milvus/Kafka/MinIO 二进制，全部使用容器并固定镜像。
-- 不下载 BGE-M3 等本地模型权重，改为 OpenAI-compatible 远程 Embedding。
+- 不下载 BGE-M3 等本地模型权重，改为 SiliconFlow 远程 Embedding 与 Chat。
 - MinIO 内容寻址去重，同一原文件不重复占空间。
 - Milvus 只存向量和筛选字段，正文不重复存储。
 - Kafka 日志、Outbox 和 Docker JSON 日志都有保留上限。
@@ -38,7 +38,7 @@
 1. 上传 `README.md`，MinIO 按 SHA-256 内容寻址落盘。
 2. PostgreSQL Outbox 发布导入事件，Kafka Consumer 成功消费。
 3. Tika 结构化解析出正文并按 Token 预算生成 5 个 Chunk。
-4. OpenAI-compatible Embedding 批量向量化，Milvus HNSW Collection 成功写入。
+4. SiliconFlow OpenAI-compatible Embedding 批量向量化，Milvus HNSW Collection 成功写入。
 5. 知识提交、审核后，Milvus 状态字段局部更新成功。
 6. 通过 Milvus + PostgreSQL 混合检索完成 RAG 问答，返回来源和置信度。
 7. 重复上传同一文件时 `storageDeduplicated=true`，确认 MinIO 未重复存储对象。
@@ -47,7 +47,7 @@
 
 本次改造还完成了以下实机验证：
 
-- Java 21 下执行 `mvn clean verify`，20 个测试全部通过；Testcontainers 在 PostgreSQL 17.10 上真实执行 Flyway V1 到 V3，并覆盖旧扫描状态迁移和 PostgreSQL 动态知识搜索，未跳过测试。
+- Java 21 下执行 `mvn clean verify`，23 个测试全部通过；Testcontainers 在 PostgreSQL 17.10 上真实执行 Flyway V1 到 V3，并覆盖旧扫描状态迁移、可配置 JWT Claim 和 PostgreSQL 动态知识搜索，未跳过测试。
 - 前端 TypeScript 检查与 Vite 生产构建通过，产物 JavaScript gzip 后约 93 KB。
 - 生产 Compose 主配置通过解析校验。
 - 后端镜像以 UID/GID `10001`、只读根文件系统、`cap_drop=ALL` 和 640 MB 上限启动，健康检查与知识 API 均正常。

@@ -9,8 +9,8 @@
 - Docker Desktop 已启动。
 - 建议 Docker 分配至少 6 GB 内存；Milvus 构建较大索引时建议 8 GB 以上。
 - Docker Disk image 上限至少 32 GB，并保持 20% 以上空闲。
-- 提供远程 OpenAI-compatible Embedding 与 Chat Completion 服务。
-- 提供 OIDC/OAuth2 身份服务，并为前端注册 Authorization Code + PKCE SPA Client。
+- 已创建 SiliconFlow API Key；Chat 与 Embedding 默认共用该 Key。
+- 已创建 Authing 免费版自建 SPA 应用，并启用 Authorization Code + PKCE。
 - 首次拉取镜像前确认有足够磁盘，避免在构建中途耗尽空间。
 
 ## 配置
@@ -23,17 +23,25 @@ cp .env.example .env
 
 - `DATABASE_PASSWORD`
 - `MINIO_SECRET_KEY`
-- `EMBEDDING_BASE_URL`
-- `EMBEDDING_MODEL`
-- `EMBEDDING_DIMENSIONS`
-- `CHAT_BASE_URL`
-- `CHAT_MODEL`
+- `SILICONFLOW_API_KEY`
 - `OAUTH2_ISSUER_URI`、`OAUTH2_AUDIENCE`
 - `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`
+- `OIDC_PRINCIPAL_CLAIM`、`OIDC_ROLES_CLAIM`、`OIDC_DOMAINS_CLAIM`（若 Authing 中采用不同名称）
 
-`EMBEDDING_BASE_URL` 应包含 OpenAI-compatible API 前缀。例如服务端端点为 `/v1/embeddings`，则配置为 `https://embedding.example.com/v1`。
+默认模型配置已经指向 SiliconFlow：
 
-OIDC SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow。Access Token 至少包含 `aud`、`preferred_username`、`roles` 和 `domains` Claims，详见 [安全配置](SECURITY.md)。
+| 配置 | 默认值 |
+| --- | --- |
+| `EMBEDDING_BASE_URL` | `https://api.siliconflow.cn/v1` |
+| `EMBEDDING_MODEL` | `BAAI/bge-m3` |
+| `EMBEDDING_DIMENSIONS` | `1024` |
+| `CHAT_BASE_URL` | `https://api.siliconflow.cn/v1` |
+| `CHAT_MODEL` | `Qwen/Qwen3-8B` |
+| `CHAT_ENABLE_THINKING` | `false` |
+
+两类服务通过 OpenAI-compatible 接口接入，可分别用 `EMBEDDING_API_KEY`、`CHAT_API_KEY` 覆盖共用 Key。RAG 默认关闭 Qwen3 思考模式，以缩短时延并把输出预算留给带引用的最终回答。免费模型适合开发和小流量演示，但供应商可能调整价格、限流和模型清单；上线前应调用 `/v1/models` 核对可用性并做限流降级演练。
+
+Authing Issuer 与浏览器 Authority 都使用 `https://<应用域名>.authing.cn/oidc`。SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow。`OAUTH2_AUDIENCE` 必须取真实 Access Token 的 `aud`，不应直接假设等于 App ID。Access Token 至少包含 `aud` 以及配置的 Principal、角色和领域 Claims，详见 [安全配置](SECURITY.md)。
 
 Apple Silicon 在中国大陆网络下载依赖较慢时，可在 `.env` 设置 `UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports` 和 `MAVEN_MIRROR=https://maven.aliyun.com/repository/public`。两个参数只影响后端镜像构建，默认仍使用官方源；Dockerfile 使用 BuildKit Maven 缓存，重复构建不会反复下载全部依赖。
 

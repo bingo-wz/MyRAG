@@ -44,6 +44,10 @@ app:
   security:
     enabled: false
     audit-enabled: false
+    claims:
+      principal: preferred_username
+      roles: roles
+      domains: domains
   import:
     storage-path: ./data/imports
     max-files-per-batch: 50

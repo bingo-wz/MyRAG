@@ -108,7 +108,7 @@ Tika 与 Tesseract 已覆盖常见格式。生产 Compose 已将 API 和解析 W
 
 ## 6. 向量化与索引
 
-- 生产 `EmbeddingService` 调用 OpenAI-compatible `/embeddings`。
+- 生产 `EmbeddingService` 默认调用 SiliconFlow OpenAI-compatible `/embeddings`，模型为 `BAAI/bge-m3`。
 - 多个 Chunk 按默认 32 条一批发送，响应按 `index` 恢复顺序并校验向量维度。
 - API 网络失败最多重试 3 次，退避期间保留中断语义。
 - PostgreSQL 保存 Chunk 正文和 `embedding_model`，不保存生产向量。

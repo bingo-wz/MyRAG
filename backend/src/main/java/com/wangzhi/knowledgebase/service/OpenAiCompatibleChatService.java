@@ -28,6 +28,7 @@ public class OpenAiCompatibleChatService implements ChatService {
     private final String model;
     private final int maxTokens;
     private final int maxAttempts;
+    private final boolean enableThinking;
     private final Timer requestTimer;
     private final Counter successCounter;
     private final Counter fallbackCounter;
@@ -40,6 +41,7 @@ public class OpenAiCompatibleChatService implements ChatService {
             @Value("${app.chat.model}") String model,
             @Value("${app.chat.max-tokens:800}") int maxTokens,
             @Value("${app.chat.max-attempts:2}") int maxAttempts,
+            @Value("${app.chat.enable-thinking:false}") boolean enableThinking,
             MeterRegistry meterRegistry) {
         RestClient.Builder configured = builder.clone().baseUrl(baseUrl);
         if (apiKey != null && !apiKey.isBlank()) {
@@ -50,6 +52,7 @@ public class OpenAiCompatibleChatService implements ChatService {
         this.model = model;
         this.maxTokens = Math.max(64, maxTokens);
         this.maxAttempts = Math.max(1, maxAttempts);
+        this.enableThinking = enableThinking;
         this.requestTimer = meterRegistry.timer("myrag.chat.request.duration", "model", model);
         this.successCounter = meterRegistry.counter("myrag.chat.requests", "model", model, "result", "success");
         this.fallbackCounter = meterRegistry.counter("myrag.chat.requests", "model", model, "result", "fallback");
@@ -104,7 +107,7 @@ public class OpenAiCompatibleChatService implements ChatService {
                 """));
         messages.add(new ChatMessage("user", "问题：%s\n\n<sources>\n%s\n</sources>"
                 .formatted(question.trim(), context.text())));
-        return new ChatRequest(model, messages, 0.1, maxTokens);
+        return new ChatRequest(model, messages, 0.1, maxTokens, enableThinking);
     }
 
     private PromptContext promptContext(List<RetrievedChunk> retrieved) {
@@ -163,7 +166,8 @@ public class OpenAiCompatibleChatService implements ChatService {
         return model;
     }
 
-    private record ChatRequest(String model, List<ChatMessage> messages, double temperature, int max_tokens) {}
+    private record ChatRequest(String model, List<ChatMessage> messages, double temperature, int max_tokens,
+                               boolean enable_thinking) {}
     private record ChatMessage(String role, String content) {}
     private record ChatResponse(List<Choice> choices, Usage usage) {}
     private record Choice(ChatMessage message) {}

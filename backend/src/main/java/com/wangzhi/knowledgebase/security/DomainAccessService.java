@@ -1,5 +1,6 @@
 package com.wangzhi.knowledgebase.security;
 
+import com.wangzhi.knowledgebase.config.SecurityClaimProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -15,9 +16,12 @@ import java.util.Set;
 public class DomainAccessService {
 
     private final boolean securityEnabled;
+    private final SecurityClaimProperties claims;
 
-    public DomainAccessService(@Value("${app.security.enabled:false}") boolean securityEnabled) {
+    public DomainAccessService(@Value("${app.security.enabled:false}") boolean securityEnabled,
+                               SecurityClaimProperties claims) {
         this.securityEnabled = securityEnabled;
+        this.claims = claims;
     }
 
     public void check(String domain) {
@@ -62,7 +66,7 @@ public class DomainAccessService {
         if (!(authentication instanceof JwtAuthenticationToken token)) {
             return Set.of();
         }
-        Object claim = token.getToken().getClaim("domains");
+        Object claim = JwtClaimResolver.resolve(token.getToken(), claims.domains());
         Set<String> result = new LinkedHashSet<>();
         if (claim instanceof Collection<?> values) {
             values.stream().map(String::valueOf).map(String::trim).filter(value -> !value.isBlank()).forEach(result::add);

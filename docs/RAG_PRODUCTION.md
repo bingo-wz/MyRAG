@@ -17,7 +17,9 @@ flowchart LR
     F --> A
 ```
 
-生产 `EmbeddingService` 调用 OpenAI-compatible `/embeddings`，生产 `ChatService` 调用 `/chat/completions`。两者可以使用同一个 AI Gateway，但建议配置不同模型、配额、超时和指标维度。
+生产 `EmbeddingService` 通过 OpenAI-compatible `/embeddings` 调用 SiliconFlow，生产 `ChatService` 调用 `/chat/completions`。默认共用 `SILICONFLOW_API_KEY`，也可以通过 `EMBEDDING_API_KEY`、`CHAT_API_KEY` 分离密钥和配额。
+
+当前轻量默认组合为 `BAAI/bge-m3`（1024 维）与 `Qwen/Qwen3-8B`。`CHAT_ENABLE_THINKING=false` 避免推理过程占用回答时延和输出预算；复杂问题可在评测后单独开启。模型名和地址均为环境变量，不应在 Java 业务代码中写死；Embedding 模型或维度变化时必须新建 Milvus Collection 或完整重建索引。
 
 ## Prompt 与引用约束
 
