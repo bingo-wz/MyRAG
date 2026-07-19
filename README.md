@@ -83,6 +83,12 @@ curl http://localhost:3000/actuator/health/liveness
 curl http://localhost:3000/actuator/health/readiness
 ```
 
+日常结束测试时建议只暂停容器，数据和容器配置都会保留，下次执行前面的 `up -d` 即可恢复：
+
+```bash
+docker compose --env-file .env -f docker-compose.production.yml stop
+```
+
 服务入口：
 
 - 管理端：[http://localhost:3000](http://localhost:3000)

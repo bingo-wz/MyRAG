@@ -61,15 +61,15 @@ curl http://localhost:3000/actuator/health/readiness
 curl http://localhost:3000/actuator/prometheus
 ```
 
-停止但保留数据：
+停止但保留容器和数据（本机日常推荐）：
 
 ```bash
-docker compose --env-file .env -f docker-compose.production.yml down
+docker compose --env-file .env -f docker-compose.production.yml stop
 ```
 
-不要在未备份时执行 `down -v`，它会删除 PostgreSQL、MinIO、Milvus、etcd 和 Kafka Volume。
+需要删除容器网络时才执行不带 `-v` 的 `down`。不要在未备份时执行 `down -v`，它会删除 PostgreSQL、MinIO、Milvus、etcd 和 Kafka Volume。
 
-Compose 项目名固定为 `myrag`，持久化卷名称分别为 `myrag_postgres-data`、`myrag_minio-data`、`myrag_milvus-data`、`myrag_etcd-data` 和 `myrag_kafka-data`。重新构建或执行不带 `-v` 的 `down` 不会删除这些数据。
+生产 Compose 项目名固定为 `myrag-local`，持久化卷名称显式固定为 `myrag_postgres-data`、`myrag_minio-data`、`myrag_milvus-data`、`myrag_etcd-data` 和 `myrag_kafka-data`。项目名调整、重新构建、`stop` 或不带 `-v` 的 `down` 都不会删除这些数据。
 
 ## 当前轻量化参数
 

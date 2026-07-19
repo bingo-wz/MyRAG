@@ -1,4 +1,4 @@
-name: myrag
+name: myrag-dev
 
 services:
   backend:
@@ -30,3 +30,4 @@ services:
 
 volumes:
   myrag-data:
+    name: myrag_dev-data

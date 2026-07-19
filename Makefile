@@ -1,7 +1,7 @@
 JAVA_HOME_21 ?= $(shell /usr/libexec/java_home -v 21 2>/dev/null || printf '%s' "$$JAVA_HOME")
 MAVEN_BIN ?= $(shell if [ -x /opt/homebrew/opt/maven/bin/mvn ]; then printf '%s' /opt/homebrew/opt/maven/bin/mvn; else command -v mvn; fi)
 
-.PHONY: dev-backend dev-frontend test test-e2e build docker-up docker-down production-config production-up production-down
+.PHONY: dev-backend dev-frontend test test-e2e build docker-up docker-down production-config production-up production-stop production-down
 
 dev-backend:
 	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH $(MAVEN_BIN) spring-boot:run
@@ -32,6 +32,9 @@ production-config:
 
 production-up:
 	docker compose --env-file .env -f docker-compose.production.yml up --build -d
+
+production-stop:
+	docker compose --env-file .env -f docker-compose.production.yml stop
 
 production-down:
 	docker compose --env-file .env -f docker-compose.production.yml down

@@ -1,4 +1,4 @@
-name: myrag
+name: myrag-local
 
 x-logging: &default-logging
   driver: json-file
@@ -256,7 +256,12 @@ services:
 
 volumes:
   postgres-data:
+    name: myrag_postgres-data
   minio-data:
+    name: myrag_minio-data
   etcd-data:
+    name: myrag_etcd-data
   milvus-data:
+    name: myrag_milvus-data
   kafka-data:
+    name: myrag_kafka-data
