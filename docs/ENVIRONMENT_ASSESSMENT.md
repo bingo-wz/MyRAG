@@ -19,7 +19,7 @@
 | Tesseract | Host 未安装 | Docker 后端镜像已经内置，不要求 Host 安装 |
 | Kafka / MinIO / Milvus | Host 未安装 | 统一通过 Docker Compose，避免污染 Host |
 | 本地 AI 模型 | 未安装 | 生产 Profile 采用远程 Embedding 与 Chat Completion，节约磁盘 |
-| OIDC | Host 未安装 | 使用外部托管 IdP，避免增加本机服务和运维负担 |
+| 登录服务 | 不需要 | 当前为本地单用户模式，不安装或连接外部身份服务 |
 
 ## 已采用的适配方案
 
@@ -47,7 +47,7 @@
 
 本次改造还完成了以下实机验证：
 
-- Java 21 下执行 `mvn clean verify`，23 个测试全部通过；Testcontainers 在 PostgreSQL 17.10 上真实执行 Flyway V1 到 V3，并覆盖旧扫描状态迁移、可配置 JWT Claim 和 PostgreSQL 动态知识搜索，未跳过测试。
+- Java 21 下执行完整测试；Testcontainers 在 PostgreSQL 17 上真实执行 Flyway，并覆盖数据库迁移与 PostgreSQL 动态知识搜索。
 - 前端 TypeScript 检查与 Vite 生产构建通过，产物 JavaScript gzip 后约 93 KB。
 - 生产 Compose 主配置通过解析校验。
 - 后端镜像以 UID/GID `10001`、只读根文件系统、`cap_drop=ALL` 和 640 MB 上限启动，健康检查与知识 API 均正常。
@@ -62,7 +62,7 @@
 docker compose up -d
 ```
 
-验证生产链路时再启动主拓扑，并连接远程模型和 OIDC：
+验证完整链路时再启动主拓扑，并连接远程模型：
 
 ```bash
 docker compose down
@@ -79,7 +79,7 @@ docker compose --env-file .env -f docker-compose.production.yml up -d
 - 小到中等批次的 Word/PDF/Excel/图片导入
 - Kafka 故障恢复、Milvus 检索和 MinIO 去重验证
 - 前后端开发、测试和面试演示
-- OIDC/JWT 权限、API/Worker 隔离和索引对账功能验证
+- API/Worker 隔离和索引对账功能验证
 
 这台电脑不适合承担：
 

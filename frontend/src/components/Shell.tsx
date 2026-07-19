@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
 import {
-  Activity, Bell, BookOpenText, Boxes, ChevronDown, CircleHelp, FileCheck2,
+  Activity, Bell, BookOpenText, Boxes, CircleHelp, FileCheck2,
   LayoutDashboard, MessageSquareText, Search, Sparkles, UploadCloud,
 } from 'lucide-react'
-import type { AuthSession } from '../auth'
 
 export type PageKey = 'dashboard' | 'knowledge' | 'imports' | 'review' | 'playground' | 'badcases'
 
@@ -20,12 +19,10 @@ interface Props {
   page: PageKey
   onNavigate: (page: PageKey) => void
   meta: { title: string; subtitle: string }
-  session: AuthSession
-  onLogout: () => void
   children: ReactNode
 }
 
-export function Shell({ page, onNavigate, meta, session, onLogout, children }: Props) {
+export function Shell({ page, onNavigate, meta, children }: Props) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -68,11 +65,6 @@ export function Shell({ page, onNavigate, meta, session, onLogout, children }: P
           <div className="top-actions">
             <button className="global-search"><Search size={17} /><span>搜索知识、任务或 Trace ID</span><kbd>⌘ K</kbd></button>
             <button className="icon-button" aria-label="通知"><Bell size={18} /><i /></button>
-            <button className="profile" onClick={onLogout} title={session.authenticated ? '退出登录' : '开发模式'}>
-              <span>{session.displayName.slice(0, 1)}</span>
-              <div><strong>{session.displayName}</strong><small>{session.roleLabel}</small></div>
-              <ChevronDown size={15} />
-            </button>
           </div>
         </header>
         <div className="content-area">{children}</div>

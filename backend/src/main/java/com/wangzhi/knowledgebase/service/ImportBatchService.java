@@ -8,8 +8,6 @@ import com.wangzhi.knowledgebase.domain.ImportFileTask;
 import com.wangzhi.knowledgebase.dto.ImportDtos.BatchView;
 import com.wangzhi.knowledgebase.repository.ImportBatchRepository;
 import com.wangzhi.knowledgebase.repository.ImportFileTaskRepository;
-import com.wangzhi.knowledgebase.security.DomainAccessService;
-import com.wangzhi.knowledgebase.security.SecurityIdentity;
 import com.wangzhi.knowledgebase.storage.ObjectStorageService;
 import com.wangzhi.knowledgebase.storage.StoredObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,8 +38,6 @@ public class ImportBatchService {
     private final KnowledgeService knowledgeService;
     private final ObjectStorageService storageService;
     private final ImportDispatch importDispatch;
-    private final DomainAccessService domainAccessService;
-    private final SecurityIdentity securityIdentity;
     private final int maxFilesPerBatch;
     private final long maxFileSizeBytes;
     private final long maxBatchSizeBytes;
@@ -51,8 +47,6 @@ public class ImportBatchService {
                               KnowledgeService knowledgeService,
                               ObjectStorageService storageService,
                               ImportDispatch importDispatch,
-                              DomainAccessService domainAccessService,
-                              SecurityIdentity securityIdentity,
                               @Value("${app.import.max-files-per-batch:50}") int maxFilesPerBatch,
                               @Value("${app.import.max-file-size-bytes:20971520}") long maxFileSizeBytes,
                               @Value("${app.import.max-batch-size-bytes:104857600}") long maxBatchSizeBytes) {
@@ -61,8 +55,6 @@ public class ImportBatchService {
         this.knowledgeService = knowledgeService;
         this.storageService = storageService;
         this.importDispatch = importDispatch;
-        this.domainAccessService = domainAccessService;
-        this.securityIdentity = securityIdentity;
         this.maxFilesPerBatch = maxFilesPerBatch;
         this.maxFileSizeBytes = maxFileSizeBytes;
         this.maxBatchSizeBytes = maxBatchSizeBytes;
@@ -79,14 +71,13 @@ public class ImportBatchService {
         if (domain == null || domain.isBlank() || createdBy == null || createdBy.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "业务领域和创建人不能为空");
         }
-        domainAccessService.check(domain);
         validateFiles(files);
         String batchId = "IMP" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
         ImportBatch batch = new ImportBatch();
         batch.setId(batchId);
         batch.setStatus(ImportBatchStatus.QUEUED);
         batch.setDomain(domain.trim());
-        batch.setCreatedBy(securityIdentity.currentOr(createdBy.trim()));
+        batch.setCreatedBy(createdBy.trim());
         batch.setTags(tags == null || tags.isBlank() ? null : tags.trim());
         batch.setTotalFiles(files.length);
         batchRepository.save(batch);
@@ -117,14 +108,12 @@ public class ImportBatchService {
     @Transactional(readOnly = true)
     public BatchView get(String batchId) {
         ImportBatch batch = requireBatch(batchId);
-        domainAccessService.check(batch.getDomain());
         return BatchView.from(batch, fileRepository.findByBatchIdOrderByIdAsc(batchId));
     }
 
     @Transactional(readOnly = true)
     public List<BatchView> recent() {
         return batchRepository.findTop20ByOrderByCreatedAtDesc().stream()
-                .filter(batch -> domainAccessService.allowed(batch.getDomain()))
                 .map(batch -> BatchView.from(batch, fileRepository.findByBatchIdOrderByIdAsc(batch.getId())))
                 .toList();
     }
@@ -132,7 +121,6 @@ public class ImportBatchService {
     @Transactional
     public BatchView retry(String batchId) {
         ImportBatch batch = requireBatch(batchId);
-        domainAccessService.check(batch.getDomain());
         List<ImportFileTask> failed = fileRepository.findByBatchIdAndStatus(batchId, ImportFileStatus.FAILED);
         if (failed.isEmpty()) {
             throw new BusinessException(HttpStatus.CONFLICT, "当前批次没有失败文件");
@@ -159,7 +147,6 @@ public class ImportBatchService {
     @Transactional
     public BatchView submit(String batchId) {
         ImportBatch batch = requireBatch(batchId);
-        domainAccessService.check(batch.getDomain());
         if (batch.getStatus() != ImportBatchStatus.READY && batch.getStatus() != ImportBatchStatus.PARTIAL_READY) {
             throw new BusinessException(HttpStatus.CONFLICT, "批次尚未处理完成，不能提交审核");
         }
@@ -180,7 +167,6 @@ public class ImportBatchService {
     @Transactional(readOnly = true)
     public byte[] report(String batchId) {
         ImportBatch batch = requireBatch(batchId);
-        domainAccessService.check(batch.getDomain());
         StringBuilder csv = new StringBuilder("batchId,fileName,fileType,sizeBytes,status,characters,documentId,retries,error\n");
         for (ImportFileTask file : fileRepository.findByBatchIdOrderByIdAsc(batchId)) {
             csv.append(csv(batch.getId())).append(',').append(csv(file.getOriginalName())).append(',')

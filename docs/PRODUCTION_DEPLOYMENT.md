@@ -10,7 +10,6 @@
 - 建议 Docker 分配至少 6 GB 内存；Milvus 构建较大索引时建议 8 GB 以上。
 - Docker Disk image 上限至少 32 GB，并保持 20% 以上空闲。
 - 已创建 SiliconFlow API Key；Chat 与 Embedding 默认共用该 Key。
-- 已创建 Authing 免费版自建 SPA 应用，并启用 Authorization Code + PKCE。
 - 首次拉取镜像前确认有足够磁盘，避免在构建中途耗尽空间。
 
 ## 配置
@@ -24,9 +23,6 @@ cp .env.example .env
 - `DATABASE_PASSWORD`
 - `MINIO_SECRET_KEY`
 - `SILICONFLOW_API_KEY`
-- `OAUTH2_ISSUER_URI`、`OAUTH2_AUDIENCE`
-- `OIDC_BROWSER_AUTHORITY`、`OIDC_CLIENT_ID`、`OIDC_SCOPES`、`OIDC_API_TOKEN_SOURCE`
-- `OIDC_PRINCIPAL_CLAIM`、`OIDC_ROLES_CLAIM`、`OIDC_DOMAINS_CLAIM`（若 Authing 中采用不同名称）
 
 默认模型配置已经指向 SiliconFlow：
 
@@ -41,7 +37,7 @@ cp .env.example .env
 
 两类服务通过 OpenAI-compatible 接口接入，可分别用 `EMBEDDING_API_KEY`、`CHAT_API_KEY` 覆盖共用 Key。RAG 默认关闭 Qwen3 思考模式，以缩短时延并把输出预算留给带引用的最终回答。免费模型适合开发和小流量演示，但供应商可能调整价格、限流和模型清单；上线前应调用 `/v1/models` 核对可用性并做限流降级演练。
 
-Authing Issuer 与浏览器 Authority 都使用 `https://<应用域名>.authing.cn/oidc`。SPA Client 必须允许回调 `https://<MyRAG域名>/auth/callback` 和登出回跳 `https://<MyRAG域名>/`，启用 Authorization Code + PKCE，禁止 Implicit Flow，并使用 RS256 签发 ID Token。Authing 默认配置 `OIDC_API_TOKEN_SOURCE=id_token`，`OAUTH2_AUDIENCE` 使用 App ID；如切换到能在 Access Token 中提供业务 Claim 的 IdP，则改为 `access_token` 并使用实际 Access Token Audience。详见 [安全配置](SECURITY.md)。
+当前版本是无登录的单用户本地工具。Compose 将前端绑定到 `127.0.0.1:3000`，不得通过反向代理、隧道或端口转发对外开放。若以后需要多人或远程访问，应先恢复完整的身份认证、授权与 TLS 边界，详见 [安全配置](SECURITY.md)。
 
 Apple Silicon 在中国大陆网络下载依赖较慢时，可在 `.env` 设置 `UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports` 和 `MAVEN_MIRROR=https://maven.aliyun.com/repository/public`。两个参数只影响后端镜像构建，默认仍使用官方源；Dockerfile 使用 BuildKit Maven 缓存，重复构建不会反复下载全部依赖。
 
@@ -133,7 +129,7 @@ Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑
 4. MinIO 使用受支持的分布式部署、TLS、KMS 和最小权限 Service Account。
 5. API 与 Import Worker 分别部署和伸缩；解析 Worker 只允许访问 MinIO、Kafka、PostgreSQL、Milvus 和模型网关。
 6. 接入 Prometheus/Grafana、集中日志、Trace、告警和值班流程。
-7. 网关启用 TLS、请求限流和 WAF；应用层继续执行 JWT/RBAC、领域隔离和审计，不能只依赖网关。
+7. 在实现身份认证、授权、TLS、请求限流和完整审计前，不得把当前本地版本部署到公网或共享网络。
 
 ## 上线门禁
 
@@ -141,6 +137,6 @@ Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑
 - Flyway 在与生产相同大版本的 PostgreSQL 空库和升级库上验证。
 - 真实 Word/PDF/Excel/图片样本回归，包含扫描件、加密件、损坏件和超限件。
 - Kafka 重复消息、Worker 崩溃、Embedding 超时、Milvus 重启演练通过。
-- OIDC 登录、Token 过期、角色矩阵、领域越权和审计查询演练通过。
+- 验证服务只监听预期的本地回环端口，外部主机无法访问管理页面和基础设施。
 - 解析超时、伪造扩展名、加密件、损坏件和压缩炸弹演练通过。
 - 压测给出单文件 P95、导入吞吐、检索 P95、峰值内存和磁盘增长率。

@@ -5,10 +5,7 @@ import com.wangzhi.knowledgebase.domain.QuestionLog;
 import com.wangzhi.knowledgebase.dto.QaDtos.FeedbackRequest;
 import com.wangzhi.knowledgebase.dto.QaDtos.Source;
 import com.wangzhi.knowledgebase.repository.QuestionLogRepository;
-import com.wangzhi.knowledgebase.security.DomainAccessService;
-import com.wangzhi.knowledgebase.security.SecurityIdentity;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,15 +15,9 @@ import java.util.List;
 public class QuestionLogService {
 
     private final QuestionLogRepository logRepository;
-    private final DomainAccessService domainAccessService;
-    private final SecurityIdentity securityIdentity;
 
-    public QuestionLogService(QuestionLogRepository logRepository,
-                              DomainAccessService domainAccessService,
-                              SecurityIdentity securityIdentity) {
+    public QuestionLogService(QuestionLogRepository logRepository) {
         this.logRepository = logRepository;
-        this.domainAccessService = domainAccessService;
-        this.securityIdentity = securityIdentity;
     }
 
     @Transactional
@@ -34,7 +25,7 @@ public class QuestionLogService {
                        long latencyMs, List<Source> sources, boolean noRetrieval) {
         QuestionLog log = new QuestionLog();
         log.setTraceId(traceId);
-        log.setAskedBy(securityIdentity.current());
+        log.setAskedBy("本地用户");
         log.setDomain(domain == null || domain.isBlank() ? null : domain.trim());
         log.setQuestion(question.trim());
         log.setAnswer(result.answer());
@@ -59,11 +50,6 @@ public class QuestionLogService {
     public void feedback(String traceId, FeedbackRequest request) {
         QuestionLog log = logRepository.findByTraceId(traceId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "问答追踪记录不存在"));
-        domainAccessService.check(log.getDomain());
-        if (domainAccessService.securityEnabled() && !domainAccessService.isAdmin()
-                && !securityIdentity.current().equals(log.getAskedBy())) {
-            throw new AccessDeniedException("不能修改其他用户的问答反馈");
-        }
         log.setAccepted(request.accepted());
         if (!request.accepted()) {
             log.setBadCase(true);

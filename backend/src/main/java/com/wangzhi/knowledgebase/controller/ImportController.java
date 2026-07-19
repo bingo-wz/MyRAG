@@ -6,7 +6,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,7 +30,6 @@ public class ImportController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public BatchView create(@RequestPart("files") MultipartFile[] files,
                             @RequestParam String domain,
                             @RequestParam(defaultValue = "知识运营") String createdBy,
@@ -40,31 +38,26 @@ public class ImportController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER')")
     public List<BatchView> recent() {
         return importBatchService.recent();
     }
 
     @GetMapping("/{batchId}")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER')")
     public BatchView get(@PathVariable String batchId) {
         return importBatchService.get(batchId);
     }
 
     @PostMapping("/{batchId}/retry")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public BatchView retry(@PathVariable String batchId) {
         return importBatchService.retry(batchId);
     }
 
     @PostMapping("/{batchId}/submit")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR')")
     public BatchView submit(@PathVariable String batchId) {
         return importBatchService.submit(batchId);
     }
 
     @GetMapping(value = "/{batchId}/report", produces = "text/csv")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER')")
     public ResponseEntity<byte[]> report(@PathVariable String batchId) {
         String filename = java.net.URLEncoder.encode(batchId + "_导入报告.csv", StandardCharsets.UTF_8);
         return ResponseEntity.ok()

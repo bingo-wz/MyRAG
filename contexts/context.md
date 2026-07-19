@@ -11,14 +11,14 @@
 - MinIO：原文件对象存储，SHA-256 内容寻址去重；同时作为单机 Milvus 的对象存储后端。
 - PostgreSQL：知识元数据、Chunk 正文、任务状态、Outbox、问答日志和 `pg_trgm` 词法索引。
 - SiliconFlow：生产 Chat 与 Embedding 托管服务，默认使用 `Qwen/Qwen3-8B` 和 `BAAI/bge-m3`，避免本机模型存储。
-- Authing 免费版：生产 OIDC 托管服务，使用 Authorization Code + PKCE；JWT Claim 名支持环境变量映射。
+- 本地单用户模式：不提供登录和角色权限，前端只绑定回环地址，操作审计统一记录为本地用户。
 
 ## 运行边界
 
 - 默认 Profile 保留 H2 + 文件系统 + Hash Embedding + Inline Vector，服务于低成本开发测试。
 - `production` Profile 强制启用 PostgreSQL + Kafka + MinIO + Milvus + 语义 Embedding。
 - 单机 Compose 用于完整拓扑集成和容量评估，不宣称具备多副本高可用能力。
-- 对外生产上线仍需部署级 SSO/RBAC、TLS、解析沙箱、备份恢复和多节点基础设施。
+- 当前无登录模式禁止直接对外提供服务；若未来开放远程访问，需重新实现认证授权、TLS、解析沙箱、备份恢复和多节点基础设施。
 
 ## 开发规范
 

@@ -4,8 +4,7 @@
 
 ```mermaid
 flowchart TB
-    OIDC["OIDC Identity Provider"] --> UI["React + Authorization Code / PKCE"]
-    UI --> API["Spring Boot API / JWT Resource Server"]
+    UI["React 本地运营台"] --> API["Spring Boot API"]
     API --> KM["KnowledgeService"]
     API --> IM["ImportBatchService"]
     API --> QA["QaService"]
@@ -118,7 +117,7 @@ stateDiagram-v2
 | `ChunkVectorIndex` | Chunk 内联向量 | Milvus |
 | `RetrievalBackend` | Java 内存扫描 | Milvus + PostgreSQL 混合召回 |
 | 数据库 | H2 自动建表 | PostgreSQL + Flyway |
-| 认证 | 关闭 | OIDC PKCE + JWT Resource Server |
+| 访问方式 | 本地无登录 | 本地无登录，仅绑定回环地址 |
 
 ## 可观测性
 
@@ -129,7 +128,7 @@ stateDiagram-v2
 - `myrag.chat.request.duration{model=...}`：Chat Completion 耗时。
 - `myrag.chat.requests{result=success|failure|fallback}`：生成结果和降级计数。
 - `/actuator/health`：基础健康状态。
-- `/actuator/health/readiness`：生产就绪状态；非语义 Embedding、非生成式 Chat 或 JWT 关闭都会使检查失败。
+- `/actuator/health/readiness`：完整拓扑就绪状态；非语义 Embedding 或非生成式 Chat 会使检查失败。
 - `/actuator/prometheus`：Prometheus 拉取入口。
 
 建议告警：Kafka 消费延迟、Outbox PENDING 数、租约超时数、导入失败率、Embedding P95、Milvus 搜索 P95、PostgreSQL 连接池和磁盘使用率。

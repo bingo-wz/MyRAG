@@ -4,7 +4,6 @@ import com.wangzhi.knowledgebase.dto.QaDtos.AskRequest;
 import com.wangzhi.knowledgebase.dto.QaDtos.AskResponse;
 import com.wangzhi.knowledgebase.dto.QaDtos.FeedbackRequest;
 import com.wangzhi.knowledgebase.dto.QaDtos.Source;
-import com.wangzhi.knowledgebase.security.DomainAccessService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,20 +15,16 @@ public class QaService {
     private final RetrievalService retrievalService;
     private final ChatService chatService;
     private final QuestionLogService logService;
-    private final DomainAccessService domainAccessService;
 
     public QaService(RetrievalService retrievalService,
                      ChatService chatService,
-                     QuestionLogService logService,
-                     DomainAccessService domainAccessService) {
+                     QuestionLogService logService) {
         this.retrievalService = retrievalService;
         this.chatService = chatService;
         this.logService = logService;
-        this.domainAccessService = domainAccessService;
     }
 
     public AskResponse ask(AskRequest request) {
-        domainAccessService.checkSearch(request.domain());
         long startedAt = System.nanoTime();
         List<RetrievedChunk> retrieved = retrievalService.retrieve(request.question(), request.domain());
         List<Source> sources = retrieved.stream().map(RetrievedChunk::toSource).toList();

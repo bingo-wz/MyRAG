@@ -22,27 +22,26 @@ class ProductionReadinessHealthIndicatorTest {
         when(chat.generative()).thenReturn(true);
         when(chat.modelName()).thenReturn("test-chat");
         ProductionReadinessHealthIndicator indicator = new ProductionReadinessHealthIndicator(
-                embedding, chat, "minio", "milvus", true, true);
+                embedding, chat, "minio", "milvus", true);
 
         assertThat(indicator.health().getStatus()).isEqualTo(Status.UP);
         assertThat(indicator.health().getDetails())
                 .containsEntry("semanticEmbedding", true)
                 .containsEntry("generativeChat", true)
-                .containsEntry("jwtSecurity", true)
                 .doesNotContainKeys("fileScanner", "fileScanningActive", "fileScannerAvailable");
     }
 
     @Test
-    void reportsOutOfServiceWhenJwtSecurityIsDisabled() {
+    void reportsOutOfServiceWhenSemanticDependenciesAreUnavailable() {
         EmbeddingService embedding = mock(EmbeddingService.class);
         ChatService chat = mock(ChatService.class);
-        when(embedding.semantic()).thenReturn(true);
+        when(embedding.semantic()).thenReturn(false);
         when(embedding.modelName()).thenReturn("test-embedding");
         when(embedding.dimensions()).thenReturn(1024);
         when(chat.generative()).thenReturn(true);
         when(chat.modelName()).thenReturn("test-chat");
         ProductionReadinessHealthIndicator indicator = new ProductionReadinessHealthIndicator(
-                embedding, chat, "minio", "milvus", true, false);
+                embedding, chat, "minio", "milvus", true);
 
         assertThat(indicator.health().getStatus()).isEqualTo(Status.OUT_OF_SERVICE);
     }

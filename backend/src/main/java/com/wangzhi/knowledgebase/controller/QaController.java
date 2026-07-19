@@ -7,7 +7,6 @@ import com.wangzhi.knowledgebase.service.QaService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,13 +25,11 @@ public class QaController {
     }
 
     @PostMapping("/ask")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER','USER')")
     public AskResponse ask(@Valid @RequestBody AskRequest request) {
         return qaService.ask(request);
     }
 
     @PostMapping("/{traceId}/feedback")
-    @PreAuthorize("hasAnyRole('ADMIN','KNOWLEDGE_OPERATOR','REVIEWER','USER')")
     public ResponseEntity<Void> feedback(@PathVariable String traceId,
                                          @Valid @RequestBody FeedbackRequest request) {
         qaService.feedback(traceId, request);

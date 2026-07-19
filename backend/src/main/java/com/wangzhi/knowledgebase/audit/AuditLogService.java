@@ -1,4 +1,4 @@
-package com.wangzhi.knowledgebase.security;
+package com.wangzhi.knowledgebase.audit;
 
 import com.wangzhi.knowledgebase.domain.AuditLog;
 import com.wangzhi.knowledgebase.repository.AuditLogRepository;

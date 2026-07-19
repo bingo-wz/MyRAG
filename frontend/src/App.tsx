@@ -6,7 +6,6 @@ import { ImportPage } from './pages/ImportPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { PlaygroundPage } from './pages/PlaygroundPage'
 import { BadCasesPage } from './pages/BadCasesPage'
-import { auth, type AuthSession } from './auth'
 
 const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: '运营概览', subtitle: '过去 7 天 · 实时数据' },
@@ -17,7 +16,7 @@ const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
   badcases: { title: 'Bad Case 追溯', subtitle: '从用户反馈回溯回答链路' },
 }
 
-function App({ session }: { session: AuthSession }) {
+function App() {
   const [page, setPage] = useState<PageKey>(() => {
     const hash = window.location.hash.slice(1) as PageKey
     return hash in pageTitles ? hash : 'dashboard'
@@ -38,7 +37,7 @@ function App({ session }: { session: AuthSession }) {
   }[page]
 
   return (
-    <Shell page={page} onNavigate={setPage} meta={pageTitles[page]} session={session} onLogout={() => auth.logout()}>
+    <Shell page={page} onNavigate={setPage} meta={pageTitles[page]}>
       <div className="page-enter" key={page}>{content}</div>
     </Shell>
   )

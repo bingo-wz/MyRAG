@@ -1,25 +1,12 @@
 import type { AskResponse, BadCase, ImportBatch, Knowledge, KnowledgePage, KnowledgeStatus, Overview } from './types'
-import { auth } from './auth'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await authorizedFetch(path, options)
+  const response = await fetch(path, options)
   if (!response.ok) {
     throw new Error(await errorMessage(response))
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
-}
-
-async function authorizedFetch(path: string, options?: RequestInit): Promise<Response> {
-  const headers = new Headers(options?.headers)
-  const apiToken = await auth.apiToken()
-  if (apiToken) headers.set('Authorization', `Bearer ${apiToken}`)
-  const response = await fetch(path, { ...options, headers })
-  if (response.status === 401 && auth.configured) {
-    await auth.login()
-    throw new Error('登录状态已失效，正在重新登录')
-  }
-  return response
 }
 
 async function errorMessage(response: Response): Promise<string> {
@@ -34,7 +21,7 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 async function download(path: string, filename: string): Promise<void> {
-  const response = await authorizedFetch(path)
+  const response = await fetch(path)
   if (!response.ok) throw new Error(await errorMessage(response))
   const url = URL.createObjectURL(await response.blob())
   const anchor = document.createElement('a')

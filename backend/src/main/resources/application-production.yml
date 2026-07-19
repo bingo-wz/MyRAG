@@ -1,10 +1,4 @@
 spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${OAUTH2_ISSUER_URI}
-          audiences: ${OAUTH2_AUDIENCE}
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/myrag}
     driver-class-name: org.postgresql.Driver
@@ -54,13 +48,8 @@ app:
   demo-data: false
   runtime:
     api-enabled: ${API_ENABLED:true}
-  security:
+  audit:
     enabled: true
-    audit-enabled: true
-    claims:
-      principal: ${OIDC_PRINCIPAL_CLAIM:preferred_username}
-      roles: ${OIDC_ROLES_CLAIM:roles}
-      domains: ${OIDC_DOMAINS_CLAIM:domains}
   readiness:
     enabled: true
   storage:

@@ -4,8 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,16 +28,6 @@ public class GlobalExceptionHandler {
         FieldError first = exception.getBindingResult().getFieldErrors().stream().findFirst().orElse(null);
         String message = first == null ? "请求参数不合法" : first.getField() + " " + first.getDefaultMessage();
         return error(HttpStatus.BAD_REQUEST, message);
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException exception) {
-        return error(HttpStatus.FORBIDDEN, "无权执行该操作");
-    }
-
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException exception) {
-        return error(HttpStatus.UNAUTHORIZED, "请先登录");
     }
 
     @ExceptionHandler(Exception.class)

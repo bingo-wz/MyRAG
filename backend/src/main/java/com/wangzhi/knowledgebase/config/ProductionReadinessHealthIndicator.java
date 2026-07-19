@@ -17,33 +17,28 @@ public class ProductionReadinessHealthIndicator implements HealthIndicator {
     private final String storageProvider;
     private final String vectorStore;
     private final boolean kafkaEnabled;
-    private final boolean securityEnabled;
 
     public ProductionReadinessHealthIndicator(EmbeddingService embeddingService,
                                               ChatService chatService,
                                               @Value("${app.storage.provider}") String storageProvider,
                                               @Value("${app.vector.store}") String vectorStore,
-                                              @Value("${app.kafka.enabled:false}") boolean kafkaEnabled,
-                                              @Value("${app.security.enabled:false}") boolean securityEnabled) {
+                                              @Value("${app.kafka.enabled:false}") boolean kafkaEnabled) {
         this.embeddingService = embeddingService;
         this.chatService = chatService;
         this.storageProvider = storageProvider;
         this.vectorStore = vectorStore;
         this.kafkaEnabled = kafkaEnabled;
-        this.securityEnabled = securityEnabled;
     }
 
     @Override
     public Health health() {
-        boolean ready = embeddingService.semantic() && chatService.generative()
-                && securityEnabled;
+        boolean ready = embeddingService.semantic() && chatService.generative();
         Health.Builder health = ready ? Health.up() : Health.outOfService();
         return health.withDetail("embeddingModel", embeddingService.modelName())
                 .withDetail("embeddingDimensions", embeddingService.dimensions())
                 .withDetail("semanticEmbedding", embeddingService.semantic())
                 .withDetail("chatModel", chatService.modelName())
                 .withDetail("generativeChat", chatService.generative())
-                .withDetail("jwtSecurity", securityEnabled)
                 .withDetail("objectStorage", storageProvider)
                 .withDetail("vectorStore", vectorStore)
                 .withDetail("kafka", kafkaEnabled)
