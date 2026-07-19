@@ -13,9 +13,12 @@ import java.time.LocalDateTime;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface ImportBatchRepository extends JpaRepository<ImportBatch, String> {
     List<ImportBatch> findTop20ByOrderByCreatedAtDesc();
+
+    long countByStatusIn(Collection<ImportBatchStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

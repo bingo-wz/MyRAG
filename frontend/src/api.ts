@@ -1,4 +1,4 @@
-import type { AskResponse, BadCase, ImportBatch, Knowledge, KnowledgePage, KnowledgeStatus, Overview } from './types'
+import type { AskResponse, BadCase, ImportBatch, Knowledge, KnowledgeForm, KnowledgePage, KnowledgeStatus, Overview } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options)
@@ -40,19 +40,24 @@ const jsonOptions = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   overview: () => request<Overview>('/api/analytics/overview'),
   badCases: () => request<BadCase[]>('/api/analytics/bad-cases'),
-  knowledge: (params: { keyword?: string; status?: KnowledgeStatus | ''; domain?: string; size?: number } = {}) => {
+  knowledge: (params: { keyword?: string; status?: KnowledgeStatus | ''; domain?: string; page?: number; size?: number } = {}) => {
     const query = new URLSearchParams()
     if (params.keyword) query.set('keyword', params.keyword)
     if (params.status) query.set('status', params.status)
     if (params.domain) query.set('domain', params.domain)
-    query.set('size', String(params.size ?? 50))
+    query.set('page', String(params.page ?? 0))
+    query.set('size', String(params.size ?? 20))
     return request<KnowledgePage>(`/api/knowledge?${query}`)
   },
-  createKnowledge: (body: Record<string, string>) => request<Knowledge>('/api/knowledge', jsonOptions('POST', body)),
+  domains: () => request<string[]>('/api/knowledge/domains'),
+  createKnowledge: (body: KnowledgeForm) => request<Knowledge>('/api/knowledge', jsonOptions('POST', body)),
+  updateKnowledge: (id: number, body: KnowledgeForm) => request<Knowledge>(`/api/knowledge/${id}`, jsonOptions('PUT', body)),
   submitKnowledge: (id: number) => request<Knowledge>(`/api/knowledge/${id}/submit`, { method: 'POST' }),
   reviewKnowledge: (id: number, approved: boolean, comment: string) =>
-    request<Knowledge>(`/api/knowledge/${id}/review`, jsonOptions('POST', { approved, reviewer: '王敏', comment })),
+    request<Knowledge>(`/api/knowledge/${id}/review`, jsonOptions('POST', { approved, reviewer: '本地用户', comment })),
   offlineKnowledge: (id: number) => request<Knowledge>(`/api/knowledge/${id}/offline`, { method: 'POST' }),
+  reactivateKnowledge: (id: number) => request<Knowledge>(`/api/knowledge/${id}/reactivate`, { method: 'POST' }),
+  deleteKnowledge: (id: number) => request<void>(`/api/knowledge/${id}`, { method: 'DELETE' }),
   ask: (question: string, domain?: string) => request<AskResponse>('/api/qa/ask', jsonOptions('POST', { question, domain })),
   feedback: (traceId: string, accepted: boolean, reason?: string) =>
     request<void>(`/api/qa/${traceId}/feedback`, jsonOptions('POST', { accepted, reason })),

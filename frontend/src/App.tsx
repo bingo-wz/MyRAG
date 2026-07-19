@@ -6,6 +6,7 @@ import { ImportPage } from './pages/ImportPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { PlaygroundPage } from './pages/PlaygroundPage'
 import { BadCasesPage } from './pages/BadCasesPage'
+import type { KnowledgeDraftSeed } from './types'
 
 const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: '运营概览', subtitle: '过去 7 天 · 实时数据' },
@@ -21,6 +22,7 @@ function App() {
     const hash = window.location.hash.slice(1) as PageKey
     return hash in pageTitles ? hash : 'dashboard'
   })
+  const [knowledgeSeed, setKnowledgeSeed] = useState<KnowledgeDraftSeed | null>(null)
 
   useEffect(() => {
     window.location.hash = page
@@ -29,11 +31,11 @@ function App() {
 
   const content = {
     dashboard: <DashboardPage navigate={setPage} />,
-    knowledge: <KnowledgePage />,
+    knowledge: <KnowledgePage seed={knowledgeSeed} onSeedConsumed={() => setKnowledgeSeed(null)} />,
     imports: <ImportPage />,
     review: <ReviewPage />,
     playground: <PlaygroundPage />,
-    badcases: <BadCasesPage />,
+    badcases: <BadCasesPage onCreateKnowledge={(seed) => { setKnowledgeSeed(seed); setPage('knowledge') }} />,
   }[page]
 
   return (

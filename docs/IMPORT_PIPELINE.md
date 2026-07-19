@@ -79,11 +79,13 @@ flowchart LR
 
 - Consumer 收到的消息仅包含 `batchId`，大文件不进入 Kafka。
 - Worker 对批次行加悲观锁，只有 `QUEUED` 或租约已过期的 `PROCESSING` 可被领取。
-- 领取时写入 `workerId`、`leaseUntil` 和尝试次数。
-- 每完成一个文件更新进度并续租。
+- 领取时写入 `workerId`、`leaseUntil` 和尝试次数；文件任务使用条件更新原子地从 `QUEUED` 进入 `DETECTING`。
+- Worker 按租约时长的三分之一持续续租，并在检测、解析、校验、向量化等长阶段前后核验所有权；租约丢失立即停止当前处理，不把基础设施接管误记为业务失败。
+- 租约过期重新领取时，`DETECTING`、`EXTRACTING`、`VALIDATING`、`INDEXING` 中断任务统一回到 `QUEUED` 并累计恢复次数。
 - Kafka 失败处理和数据库兜底 Worker 共用同一租约协议。
 - 生产兜底扫描默认 30 秒一次、启动后 60 秒才介入，优先让 Kafka 实时消费。
 - 进程级故障最多恢复 5 次；单文件业务错误由运营人员在界面选择重试。
+- 每个导入文件任务只允许关联一个知识文档。数据库以 `knowledge_documents.import_task_id` 部分唯一索引兜底；如果 Worker 在完成索引后、更新任务状态前崩溃，恢复时直接复用已有文档并完成任务。
 
 ## 4. 解析与 OCR
 
@@ -122,6 +124,7 @@ Tika 与 Tesseract 已覆盖常见格式。生产 Compose 已将 API 和解析 W
 
 - 解析成功只生成 `DRAFT`，不会直接污染在线召回。
 - 运营人员可查看逐文件 MIME、字符数、对象去重状态、知识 ID、错误和重试次数。
+- 删除导入生成的草稿时只清空任务的知识引用，批次、文件来源和处理结果仍保留用于审计。
 - 批次确认后成功项进入 `PENDING_REVIEW`。
 - 审核通过才成为 `APPROVED`；PostgreSQL 与 Milvus 两路检索都过滤该状态。
 - 导入报告可导出 CSV，用于运营对账。
@@ -137,3 +140,9 @@ Tika 与 Tesseract 已覆盖常见格式。生产 Compose 已将 API 和解析 W
 - PostgreSQL、MinIO、Kafka、Milvus 的备份与恢复演练
 
 仓库已经实现格式/MIME/大小/字符上限、内容去重、解析超时、任务租约、恢复和跨组件自动对账。当前版本仅用于本地单用户场景；若未来开放远程或多人使用，必须先补齐认证授权、模型网关、TLS/KMS、PII 策略，并完成损坏件、超限件和故障演练。若允许不可信文件上传，还应在独立沙箱层补充组织认可的恶意文件检测。
+
+## 自动化故障验证
+
+- `ImportRecoveryIntegrationTest`：覆盖索引阶段中断恢复、已有文档复用、恢复次数耗尽和重复消息投递。
+- `PostgresMigrationContainerTest`：在真实 PostgreSQL 中验证 V1–V4 升级、旧 `SCANNING` 状态迁移、`import_task_id` 字段和唯一索引。
+- `frontend/e2e/knowledge-workflow.spec.ts`：覆盖知识创建、提交审核、审核通过、限定领域问答和负反馈进入 Bad Case。

@@ -15,9 +15,13 @@ public final class AnalyticsDtos {
             long pendingReview,
             long questionCount,
             double acceptanceRate,
+            double acceptanceRateDelta,
             double averageConfidence,
             long averageLatencyMs,
+            long latencyP95Ms,
             long badCaseCount,
+            Long oldestPendingMinutes,
+            long activeImportBatches,
             List<DailyPoint> trend,
             Map<String, Long> domainDistribution
     ) {}

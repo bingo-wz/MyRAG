@@ -47,7 +47,7 @@ class PostgresMigrationContainerTest {
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration")
                 .load();
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
 
         try (Connection connection = postgres.createConnection("");
              ResultSet result = connection.createStatement().executeQuery("""
@@ -65,6 +65,26 @@ class PostgresMigrationContainerTest {
                      """)) {
             assertThat(result.next()).isTrue();
             assertThat(result.getString(1)).isEqualTo("QUEUED");
+        }
+        try (Connection connection = postgres.createConnection("");
+             ResultSet result = connection.createStatement().executeQuery("""
+                     SELECT COUNT(*)
+                     FROM information_schema.columns
+                     WHERE table_name = 'knowledge_documents'
+                       AND column_name = 'import_task_id'
+                     """)) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1)).isEqualTo(1);
+        }
+        try (Connection connection = postgres.createConnection("");
+             ResultSet result = connection.createStatement().executeQuery("""
+                     SELECT COUNT(*)
+                     FROM pg_indexes
+                     WHERE tablename = 'knowledge_documents'
+                       AND indexname = 'uk_knowledge_documents_import_task'
+                     """)) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1)).isEqualTo(1);
         }
     }
 }

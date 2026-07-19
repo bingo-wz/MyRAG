@@ -56,6 +56,9 @@ public class KnowledgeDocument {
     @Column(length = 64)
     private String sourceHash;
 
+    @Column(name = "import_task_id", unique = true)
+    private Long importTaskId;
+
     @Column(nullable = false, length = 80)
     private String createdBy;
 
@@ -107,6 +110,8 @@ public class KnowledgeDocument {
     public void setIndexVersion(long indexVersion) { this.indexVersion = indexVersion; }
     public String getSourceHash() { return sourceHash; }
     public void setSourceHash(String sourceHash) { this.sourceHash = sourceHash; }
+    public Long getImportTaskId() { return importTaskId; }
+    public void setImportTaskId(Long importTaskId) { this.importTaskId = importTaskId; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }

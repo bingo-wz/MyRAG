@@ -19,9 +19,9 @@ export function DashboardPage({ navigate }: { navigate: (page: PageKey) => void 
 
   const metrics = [
     { label: '已生效知识', value: data.approvedKnowledge.toLocaleString(), note: `共 ${data.totalKnowledge} 条`, icon: BookOpenCheck, accent: true },
-    { label: '问答采纳率', value: `${data.acceptanceRate}%`, note: '较上周 +3.6%', icon: TrendingUp },
+    { label: '问答采纳率', value: `${data.acceptanceRate}%`, note: `较前 7 天 ${signed(data.acceptanceRateDelta)} 个百分点`, icon: TrendingUp },
     { label: '平均置信度', value: `${data.averageConfidence}%`, note: '目标 ≥ 80%', icon: CircleGauge },
-    { label: '平均响应时间', value: `${data.averageLatencyMs}ms`, note: 'P95 1.4s', icon: Clock3 },
+    { label: '平均响应时间', value: `${data.averageLatencyMs}ms`, note: `P95 ${data.latencyP95Ms}ms`, icon: Clock3 },
   ]
 
   return (
@@ -45,9 +45,9 @@ export function DashboardPage({ navigate }: { navigate: (page: PageKey) => void 
         <aside className="attention-panel">
           <span className="eyebrow">NEEDS ATTENTION</span>
           <h2>今日待处理</h2>
-          <button onClick={() => navigate('review')}><div className="attention-icon amber"><MessageSquareMore size={20} /></div><div><strong>{data.pendingReview} 条知识待审核</strong><span>最早提交于 42 分钟前</span></div><ArrowRight size={17} /></button>
+          <button onClick={() => navigate('review')}><div className="attention-icon amber"><MessageSquareMore size={20} /></div><div><strong>{data.pendingReview} 条知识待审核</strong><span>{data.oldestPendingMinutes === undefined || data.oldestPendingMinutes === null ? '当前没有等待中的知识' : `最长已等待 ${duration(data.oldestPendingMinutes)}`}</span></div><ArrowRight size={17} /></button>
           <button onClick={() => navigate('badcases')}><div className="attention-icon red"><ShieldAlert size={20} /></div><div><strong>{data.badCaseCount} 个 Bad Case</strong><span>需要补充知识或修正召回</span></div><ArrowRight size={17} /></button>
-          <button onClick={() => navigate('imports')}><div className="attention-icon teal"><Clock3 size={20} /></div><div><strong>批量导入任务</strong><span>查看解析与入库进度</span></div><ArrowRight size={17} /></button>
+          <button onClick={() => navigate('imports')}><div className="attention-icon teal"><Clock3 size={20} /></div><div><strong>{data.activeImportBatches} 个导入批次处理中</strong><span>查看解析、重试与入库进度</span></div><ArrowRight size={17} /></button>
         </aside>
       </section>
 
@@ -64,9 +64,11 @@ function TrendChart({ data }: { data: Overview['trend'] }) {
   const points = useMemo(() => data.map((item, index) => {
     const x = 35 + index * (610 / Math.max(data.length - 1, 1))
     const y = 180 - (item.questions / max) * 130
-    return { x, y, ...item }
+    const acceptanceY = 180 - (item.acceptanceRate / 100) * 130
+    return { x, y, acceptanceY, ...item }
   }), [data, max])
   const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ')
+  const acceptancePath = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.acceptanceY}`).join(' ')
   const area = `${path} L ${points.at(-1)?.x ?? 645} 190 L 35 190 Z`
   return (
     <div className="chart-wrap">
@@ -75,10 +77,21 @@ function TrendChart({ data }: { data: Overview['trend'] }) {
         <defs><linearGradient id="chartArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d9f89" stopOpacity=".28" /><stop offset="1" stopColor="#3d9f89" stopOpacity="0" /></linearGradient></defs>
         <path d={area} fill="url(#chartArea)" />
         <path d={path} className="chart-line" />
+        <path d={acceptancePath} className="acceptance-line" />
         {points.map((point) => <g key={point.date}><circle cx={point.x} cy={point.y} r="4" className="chart-point" /><text x={point.x} y="217" textAnchor="middle">{point.date.slice(5)}</text><text x={point.x} y={point.y - 12} textAnchor="middle" className="chart-value">{point.questions}</text></g>)}
       </svg>
     </div>
   )
+}
+
+function signed(value: number) {
+  return `${value > 0 ? '+' : ''}${value}`
+}
+
+function duration(minutes: number) {
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  return hours < 24 ? `${hours} 小时` : `${Math.floor(hours / 24)} 天`
 }
 
 function DomainDistribution({ data }: { data: Record<string, number> }) {

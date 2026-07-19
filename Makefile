@@ -1,19 +1,24 @@
 JAVA_HOME_21 ?= $(shell /usr/libexec/java_home -v 21 2>/dev/null || printf '%s' "$$JAVA_HOME")
+MAVEN_BIN ?= $(shell if [ -x /opt/homebrew/opt/maven/bin/mvn ]; then printf '%s' /opt/homebrew/opt/maven/bin/mvn; else command -v mvn; fi)
 
-.PHONY: dev-backend dev-frontend test build docker-up docker-down production-config production-up production-down
+.PHONY: dev-backend dev-frontend test test-e2e build docker-up docker-down production-config production-up production-down
 
 dev-backend:
-	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH mvn spring-boot:run
+	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH $(MAVEN_BIN) spring-boot:run
 
 dev-frontend:
 	cd frontend && pnpm dev
 
 test:
-	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH mvn test
+	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH $(MAVEN_BIN) test
+	cd frontend && pnpm test:unit
 	cd frontend && pnpm build
 
+test-e2e:
+	cd frontend && pnpm test:e2e
+
 build:
-	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH mvn -DskipTests package
+	cd backend && JAVA_HOME=$(JAVA_HOME_21) PATH=$(JAVA_HOME_21)/bin:$$PATH $(MAVEN_BIN) -DskipTests package
 	cd frontend && pnpm build
 
 docker-up:

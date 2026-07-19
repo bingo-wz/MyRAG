@@ -15,8 +15,14 @@ import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.beans.factory.annotation.Value;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ImportProcessor {
@@ -28,6 +34,9 @@ public class ImportProcessor {
     private final TimedTextExtractionService extractionService;
     private final KnowledgeService knowledgeService;
     private final ImportBatchLeaseService leaseService;
+    private final ImportFileTaskStateService taskStateService;
+    private final TaskScheduler taskScheduler;
+    private final Duration heartbeatInterval;
     private final Counter successCounter;
     private final Counter failureCounter;
     private final Timer fileTimer;
@@ -37,12 +46,18 @@ public class ImportProcessor {
                            TimedTextExtractionService extractionService,
                            KnowledgeService knowledgeService,
                            ImportBatchLeaseService leaseService,
+                           ImportFileTaskStateService taskStateService,
+                           TaskScheduler taskScheduler,
+                           @Value("${app.import.lease-seconds:300}") long leaseSeconds,
                            MeterRegistry meterRegistry) {
         this.batchRepository = batchRepository;
         this.fileRepository = fileRepository;
         this.extractionService = extractionService;
         this.knowledgeService = knowledgeService;
         this.leaseService = leaseService;
+        this.taskStateService = taskStateService;
+        this.taskScheduler = taskScheduler;
+        this.heartbeatInterval = Duration.ofSeconds(Math.max(5, leaseSeconds / 3));
         this.successCounter = meterRegistry.counter("myrag.import.files", "result", "success");
         this.failureCounter = meterRegistry.counter("myrag.import.files", "result", "failure");
         this.fileTimer = meterRegistry.timer("myrag.import.file.duration");
@@ -53,23 +68,55 @@ public class ImportProcessor {
         if (batch == null) {
             return;
         }
-        batch.setStatus(ImportBatchStatus.PROCESSING);
-        batchRepository.save(batch);
-        List<ImportFileTask> tasks = fileRepository.findByBatchIdAndStatus(batchId, ImportFileStatus.QUEUED);
-        for (ImportFileTask task : tasks) {
-            processOne(batch, task);
-            refreshProgress(batchId);
-            leaseService.heartbeat(batchId, workerId);
+        AtomicBoolean leaseLost = new AtomicBoolean(false);
+        ensureLease(batchId, workerId, leaseLost);
+        ScheduledFuture<?> heartbeat = taskScheduler.scheduleAtFixedRate(() -> {
+            try {
+                if (!leaseService.heartbeat(batchId, workerId)) {
+                    leaseLost.set(true);
+                }
+            } catch (RuntimeException exception) {
+                log.warn("导入租约心跳异常，将停止当前处理并等待恢复，batchId={}", batchId, exception);
+                leaseLost.set(true);
+            }
+        }, heartbeatInterval);
+        try {
+            List<ImportFileTask> tasks = fileRepository.findByBatchIdAndStatusOrderByIdAsc(
+                    batchId, ImportFileStatus.QUEUED);
+            for (ImportFileTask candidate : tasks) {
+                ensureLease(batchId, workerId, leaseLost);
+                Optional<ImportFileTask> claimed = taskStateService.claim(candidate.getId());
+                if (claimed.isEmpty()) {
+                    continue;
+                }
+                processOne(batch, claimed.get(), workerId, leaseLost);
+                refreshProgress(batchId);
+            }
+            ensureLease(batchId, workerId, leaseLost);
+            finish(batchId, workerId);
+        } finally {
+            if (heartbeat != null) {
+                heartbeat.cancel(false);
+            }
         }
-        finish(batchId);
     }
 
-    private void processOne(ImportBatch batch, ImportFileTask task) {
+    private void processOne(ImportBatch batch, ImportFileTask task, String workerId, AtomicBoolean leaseLost) {
         long startedAt = System.nanoTime();
         try {
-            update(task, ImportFileStatus.DETECTING);
+            ensureLease(batch.getId(), workerId, leaseLost);
+            Optional<View> existing = knowledgeService.findImported(task.getId());
+            if (existing.isPresent()) {
+                task.setDocumentId(existing.get().id());
+                task.setStatus(ImportFileStatus.READY);
+                task.setErrorMessage(null);
+                fileRepository.save(task);
+                successCounter.increment();
+                return;
+            }
             update(task, ImportFileStatus.EXTRACTING);
             ExtractionResult result = extractionService.extract(task.getStorageKey(), task.getOriginalName());
+            ensureLease(batch.getId(), workerId, leaseLost);
             task.setDetectedType(result.contentType());
             task.setExtractedCharacters(result.text().length());
             fileRepository.save(task);
@@ -77,16 +124,20 @@ public class ImportProcessor {
             update(task, ImportFileStatus.VALIDATING);
             validateType(result.contentType());
             validate(result.text());
+            ensureLease(batch.getId(), workerId, leaseLost);
 
             update(task, ImportFileStatus.INDEXING);
             CreateRequest request = new CreateRequest(titleOf(task.getOriginalName()), result.text(), batch.getDomain(),
                     "批量导入 · " + task.getOriginalName(), batch.getTags(), batch.getCreatedBy());
-            View document = knowledgeService.createImported(request, result.blocks(), task.getContentHash());
+            View document = knowledgeService.createImported(request, result.blocks(), task.getContentHash(), task.getId());
+            ensureLease(batch.getId(), workerId, leaseLost);
             task.setDocumentId(document.id());
             task.setStatus(ImportFileStatus.READY);
             task.setErrorMessage(null);
             fileRepository.save(task);
             successCounter.increment();
+        } catch (ImportLeaseLostException exception) {
+            throw exception;
         } catch (Exception exception) {
             log.error("导入文件处理失败，batchId={}，taskId={}，file={}",
                     batch.getId(), task.getId(), task.getOriginalName(), exception);
@@ -145,9 +196,12 @@ public class ImportProcessor {
         batchRepository.save(batch);
     }
 
-    private void finish(String batchId) {
+    private void finish(String batchId, String workerId) {
         refreshProgress(batchId);
         ImportBatch batch = batchRepository.findById(batchId).orElseThrow();
+        if (!workerId.equals(batch.getWorkerId()) || batch.getStatus() != ImportBatchStatus.PROCESSING) {
+            throw new ImportLeaseLostException(batchId);
+        }
         if (batch.getSucceededFiles() == 0) {
             batch.setStatus(ImportBatchStatus.FAILED);
         } else if (batch.getFailedFiles() > 0) {
@@ -159,6 +213,22 @@ public class ImportProcessor {
         batch.setLeaseUntil(null);
         batch.setNextAttemptAt(null);
         batchRepository.save(batch);
+    }
+
+    private void ensureLease(String batchId, String workerId, AtomicBoolean leaseLost) {
+        if (leaseLost.get()) {
+            throw new ImportLeaseLostException(batchId);
+        }
+        try {
+            if (leaseService.heartbeat(batchId, workerId)) {
+                return;
+            }
+        } catch (RuntimeException exception) {
+            leaseLost.set(true);
+            throw new ImportLeaseLostException(batchId, exception);
+        }
+        leaseLost.set(true);
+        throw new ImportLeaseLostException(batchId);
     }
 
     private String titleOf(String filename) {

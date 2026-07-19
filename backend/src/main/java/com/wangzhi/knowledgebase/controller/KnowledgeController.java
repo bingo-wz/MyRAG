@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/knowledge")
@@ -50,6 +51,11 @@ public class KnowledgeController {
     @GetMapping("/{id}")
     public View get(@PathVariable Long id) {
         return knowledgeService.get(id);
+    }
+
+    @GetMapping("/domains")
+    public List<String> domains() {
+        return knowledgeService.domains();
     }
 
     @PostMapping

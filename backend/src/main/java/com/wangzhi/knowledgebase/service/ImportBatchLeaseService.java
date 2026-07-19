@@ -16,13 +16,16 @@ import java.util.Optional;
 public class ImportBatchLeaseService {
 
     private final ImportBatchRepository repository;
+    private final ImportFileTaskStateService taskStateService;
     private final Duration leaseDuration;
     private final int maxAttempts;
 
     public ImportBatchLeaseService(ImportBatchRepository repository,
+                                   ImportFileTaskStateService taskStateService,
                                    @Value("${app.import.lease-seconds:300}") long leaseSeconds,
                                    @Value("${app.import.max-attempts:5}") int maxAttempts) {
         this.repository = repository;
+        this.taskStateService = taskStateService;
         this.leaseDuration = Duration.ofSeconds(Math.max(30, leaseSeconds));
         this.maxAttempts = Math.max(1, maxAttempts);
     }
@@ -30,17 +33,17 @@ public class ImportBatchLeaseService {
     @Transactional
     public Optional<String> claim(String workerId) {
         LocalDateTime now = LocalDateTime.now();
-        return repository.findClaimable(ImportBatchStatus.QUEUED, ImportBatchStatus.PROCESSING,
-                        now, PageRequest.of(0, 1)).stream().findFirst().map(batch -> {
-            batch.setStatus(ImportBatchStatus.PROCESSING);
-            batch.setWorkerId(workerId);
-            batch.setLeaseUntil(now.plus(leaseDuration));
-            batch.setNextAttemptAt(null);
-            batch.setAttemptCount(batch.getAttemptCount() + 1);
-            batch.setLastError(null);
-            repository.save(batch);
-            return batch.getId();
-        });
+        while (true) {
+            Optional<ImportBatch> candidate = repository.findClaimable(ImportBatchStatus.QUEUED,
+                    ImportBatchStatus.PROCESSING, now, PageRequest.of(0, 1)).stream().findFirst();
+            if (candidate.isEmpty()) {
+                return Optional.empty();
+            }
+            Optional<String> claimed = claim(candidate.get(), workerId, now);
+            if (claimed.isPresent()) {
+                return claimed;
+            }
+        }
     }
 
     @Transactional
@@ -51,24 +54,19 @@ public class ImportBatchLeaseService {
                                 && (batch.getNextAttemptAt() == null || !batch.getNextAttemptAt().isAfter(now)))
                                 || (batch.getStatus() == ImportBatchStatus.PROCESSING
                                 && batch.getLeaseUntil() != null && batch.getLeaseUntil().isBefore(now)))
-                .map(batch -> {
-                    batch.setStatus(ImportBatchStatus.PROCESSING);
-                    batch.setWorkerId(workerId);
-                    batch.setLeaseUntil(now.plus(leaseDuration));
-                    batch.setNextAttemptAt(null);
-                    batch.setAttemptCount(batch.getAttemptCount() + 1);
-                    batch.setLastError(null);
-                    repository.save(batch);
-                    return batch.getId();
-                });
+                .flatMap(batch -> claim(batch, workerId, now));
     }
 
     @Transactional
-    public void heartbeat(String batchId, String workerId) {
-        repository.findById(batchId).filter(batch -> workerId.equals(batch.getWorkerId())).ifPresent(batch -> {
-            batch.setLeaseUntil(LocalDateTime.now().plus(leaseDuration));
-            repository.save(batch);
-        });
+    public boolean heartbeat(String batchId, String workerId) {
+        return repository.findLockedById(batchId)
+                .filter(batch -> batch.getStatus() == ImportBatchStatus.PROCESSING)
+                .filter(batch -> workerId.equals(batch.getWorkerId()))
+                .map(batch -> {
+                    batch.setLeaseUntil(LocalDateTime.now().plus(leaseDuration));
+                    repository.save(batch);
+                    return true;
+                }).orElse(false);
     }
 
     @Transactional
@@ -80,6 +78,7 @@ public class ImportBatchLeaseService {
             batch.setLeaseUntil(null);
             if (batch.getAttemptCount() >= maxAttempts) {
                 batch.setStatus(ImportBatchStatus.FAILED);
+                taskStateService.failRecoverable(batchId);
             } else {
                 long delaySeconds = Math.min(300, 5L << Math.min(6, batch.getAttemptCount() - 1));
                 batch.setStatus(ImportBatchStatus.QUEUED);
@@ -87,6 +86,28 @@ public class ImportBatchLeaseService {
             }
             repository.save(batch);
         });
+    }
+
+    private Optional<String> claim(ImportBatch batch, String workerId, LocalDateTime now) {
+        if (batch.getAttemptCount() >= maxAttempts) {
+            batch.setStatus(ImportBatchStatus.FAILED);
+            batch.setWorkerId(null);
+            batch.setLeaseUntil(null);
+            batch.setNextAttemptAt(null);
+            batch.setLastError("批次超过最大自动恢复次数");
+            repository.save(batch);
+            taskStateService.failRecoverable(batch.getId());
+            return Optional.empty();
+        }
+        taskStateService.requeueInterrupted(batch.getId());
+        batch.setStatus(ImportBatchStatus.PROCESSING);
+        batch.setWorkerId(workerId);
+        batch.setLeaseUntil(now.plus(leaseDuration));
+        batch.setNextAttemptAt(null);
+        batch.setAttemptCount(batch.getAttemptCount() + 1);
+        batch.setLastError(null);
+        repository.save(batch);
+        return Optional.of(batch.getId());
     }
 
     private String rootMessage(Throwable throwable) {

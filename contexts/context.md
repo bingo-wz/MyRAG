@@ -24,6 +24,7 @@
 
 - 解释、文档和新增注释使用中文。
 - Java 21，Spring Boot 4.1，React 19，TypeScript 严格模式。
-- 后端变更必须通过 `mvn test`，前端变更必须通过 `pnpm build`。
+- 后端变更必须通过 `mvn test`，前端变更必须通过 `pnpm test:unit` 与 `pnpm build`。
+- 知识创建、审核、问答和 Bad Case 闭环变更必须通过 `pnpm test:e2e`。
 - 生产 Schema 必须由 Flyway 管理并在真实 PostgreSQL 上校验。
 - 不提交构建产物、导入原文件、运行数据库、日志、密钥或个人简历。

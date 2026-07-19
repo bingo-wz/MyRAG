@@ -133,10 +133,11 @@ Milvus 已启用用户认证，Compose 仅把 Milvus 和 MinIO Console 端口绑
 
 ## 上线门禁
 
-- `mvn test` 与 `pnpm build` 全部通过。
+- `mvn test`、`pnpm test:unit`、`pnpm build` 与 `pnpm test:e2e` 全部通过。
 - Flyway 在与生产相同大版本的 PostgreSQL 空库和升级库上验证。
 - 真实 Word/PDF/Excel/图片样本回归，包含扫描件、加密件、损坏件和超限件。
-- Kafka 重复消息、Worker 崩溃、Embedding 超时、Milvus 重启演练通过。
+- Kafka 重复消息、Worker 在解析/向量化/索引后崩溃、租约转移、恢复次数耗尽、Embedding 超时和 Milvus 重启演练通过。
+- 确认同一 `import_task_id` 在数据库中最多对应一个知识文档，且失败恢复不会重复计费向量化。
 - 验证服务只监听预期的本地回环端口，外部主机无法访问管理页面和基础设施。
 - 解析超时、伪造扩展名、加密件、损坏件和压缩炸弹演练通过。
 - 压测给出单文件 P95、导入吞吐、检索 P95、峰值内存和磁盘增长率。

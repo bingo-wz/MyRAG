@@ -12,6 +12,7 @@ import com.wangzhi.knowledgebase.dto.KnowledgeDtos.UpdateRequest;
 import com.wangzhi.knowledgebase.dto.KnowledgeDtos.View;
 import com.wangzhi.knowledgebase.repository.KnowledgeChunkRepository;
 import com.wangzhi.knowledgebase.repository.KnowledgeDocumentRepository;
+import com.wangzhi.knowledgebase.repository.ImportFileTaskRepository;
 import com.wangzhi.knowledgebase.service.ChunkingService.ChunkDraft;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,23 +28,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 public class KnowledgeService {
 
     private final KnowledgeDocumentRepository documentRepository;
     private final KnowledgeChunkRepository chunkRepository;
+    private final ImportFileTaskRepository importFileTaskRepository;
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
     private final ChunkVectorIndex vectorIndex;
 
     public KnowledgeService(KnowledgeDocumentRepository documentRepository,
                             KnowledgeChunkRepository chunkRepository,
+                            ImportFileTaskRepository importFileTaskRepository,
                             ChunkingService chunkingService,
                             EmbeddingService embeddingService,
                             ChunkVectorIndex vectorIndex) {
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
+        this.importFileTaskRepository = importFileTaskRepository;
         this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
         this.vectorIndex = vectorIndex;
@@ -95,12 +100,27 @@ public class KnowledgeService {
     }
 
     @Transactional
-    public View createImported(CreateRequest request, List<ParsedBlock> blocks, String sourceHash) {
+    public View createImported(CreateRequest request, List<ParsedBlock> blocks, String sourceHash, Long importTaskId) {
+        Optional<KnowledgeDocument> existing = documentRepository.findByImportTaskId(importTaskId);
+        if (existing.isPresent()) {
+            return View.from(existing.get());
+        }
         KnowledgeDocument document = new KnowledgeDocument();
         apply(document, request.title(), request.content(), request.domain(), request.source(), request.tags());
         document.setCreatedBy(request.createdBy().trim());
         document.setSourceHash(sourceHash);
+        document.setImportTaskId(importTaskId);
         return View.from(saveAndIndex(document, blocks));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<View> findImported(Long importTaskId) {
+        return documentRepository.findByImportTaskId(importTaskId).map(View::from);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> domains() {
+        return documentRepository.findDistinctDomains();
     }
 
     @Transactional
@@ -220,6 +240,7 @@ public class KnowledgeService {
         }
         vectorIndex.deleteDocument(id);
         chunkRepository.deleteByDocumentId(id);
+        importFileTaskRepository.clearDocumentReference(id);
         documentRepository.delete(document);
     }
 

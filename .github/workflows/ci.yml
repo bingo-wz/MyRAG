@@ -45,8 +45,47 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
+      - name: 前端单元测试
+        run: pnpm test:unit
       - name: TypeScript 与生产构建
         run: pnpm build
+
+  frontend-e2e:
+    name: 前端端到端测试
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "10"
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 安装 Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: 执行知识闭环测试
+        run: pnpm test:e2e
+      - name: 保存失败现场
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: output/playwright/
+          retention-days: 7
 
   compose:
     name: 生产编排校验

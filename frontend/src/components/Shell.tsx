@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
-  Activity, Bell, BookOpenText, Boxes, CircleHelp, FileCheck2,
+  Activity, BookOpenText, Boxes, FileCheck2,
   LayoutDashboard, MessageSquareText, Search, Sparkles, UploadCloud,
 } from 'lucide-react'
+import { api } from '../api'
+import type { Overview } from '../types'
 
 export type PageKey = 'dashboard' | 'knowledge' | 'imports' | 'review' | 'playground' | 'badcases'
 
@@ -23,6 +25,18 @@ interface Props {
 }
 
 export function Shell({ page, onNavigate, meta, children }: Props) {
+  const [overview, setOverview] = useState<Overview | null>(null)
+  useEffect(() => { api.overview().then(setOverview).catch(() => setOverview(null)) }, [page])
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        onNavigate('knowledge')
+      }
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [onNavigate])
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -39,7 +53,7 @@ export function Shell({ page, onNavigate, meta, children }: Props) {
               <button key={item.key} className={page === item.key ? 'active' : ''} onClick={() => onNavigate(item.key)}>
                 <Icon size={18} strokeWidth={1.7} />
                 <span>{item.label}</span>
-                {item.key === 'review' && <em>2</em>}
+                {item.key === 'review' && overview && overview.pendingReview > 0 && <em>{overview.pendingReview}</em>}
               </button>
             )
           })}
@@ -48,10 +62,9 @@ export function Shell({ page, onNavigate, meta, children }: Props) {
         <div className="sidebar-foot">
           <div className="index-health">
             <div><Boxes size={17} /><span>向量索引</span><i /></div>
-            <strong>13 个知识文档已就绪</strong>
-            <small>最后同步：刚刚</small>
+            <strong>{overview ? `${overview.approvedKnowledge} 个知识文档已生效` : '正在读取索引状态'}</strong>
+            <small>{overview ? `知识总量：${overview.totalKnowledge}` : '请稍候'}</small>
           </div>
-          <button className="help-link"><CircleHelp size={17} /> 使用指南</button>
         </div>
       </aside>
 
@@ -63,8 +76,7 @@ export function Shell({ page, onNavigate, meta, children }: Props) {
             <span>{meta.subtitle}</span>
           </div>
           <div className="top-actions">
-            <button className="global-search"><Search size={17} /><span>搜索知识、任务或 Trace ID</span><kbd>⌘ K</kbd></button>
-            <button className="icon-button" aria-label="通知"><Bell size={18} /><i /></button>
+            <button className="global-search" onClick={() => onNavigate('knowledge')}><Search size={17} /><span>搜索知识内容</span><kbd>⌘ K</kbd></button>
           </div>
         </header>
         <div className="content-area">{children}</div>

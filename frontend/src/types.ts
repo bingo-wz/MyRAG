@@ -25,6 +25,17 @@ export interface KnowledgePage {
   totalPages: number
 }
 
+export interface KnowledgeForm {
+  title: string
+  content: string
+  domain: string
+  source: string
+  tags: string
+  createdBy?: string
+}
+
+export type KnowledgeDraftSeed = Pick<KnowledgeForm, 'title' | 'content' | 'domain' | 'source' | 'tags'>
+
 export interface DailyPoint {
   date: string
   questions: number
@@ -37,9 +48,13 @@ export interface Overview {
   pendingReview: number
   questionCount: number
   acceptanceRate: number
+  acceptanceRateDelta: number
   averageConfidence: number
   averageLatencyMs: number
+  latencyP95Ms: number
   badCaseCount: number
+  oldestPendingMinutes?: number
+  activeImportBatches: number
   trend: DailyPoint[]
   domainDistribution: Record<string, number>
 }
