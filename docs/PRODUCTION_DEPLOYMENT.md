@@ -69,6 +69,8 @@ docker compose --env-file .env -f docker-compose.production.yml down
 
 不要在未备份时执行 `down -v`，它会删除 PostgreSQL、MinIO、Milvus、etcd 和 Kafka Volume。
 
+Compose 项目名固定为 `myrag`，持久化卷名称分别为 `myrag_postgres-data`、`myrag_minio-data`、`myrag_milvus-data`、`myrag_etcd-data` 和 `myrag_kafka-data`。重新构建或执行不带 `-v` 的 `down` 不会删除这些数据。
+
 ## 当前轻量化参数
 
 | 项目 | 单机默认 | 作用 |

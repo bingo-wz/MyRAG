@@ -38,7 +38,7 @@ app:
   ai-http:
     connect-timeout-seconds: 3
     read-timeout-seconds: 60
-  demo-data: true
+  demo-data: false
   runtime:
     api-enabled: true
   audit:
