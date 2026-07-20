@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM maven:3-eclipse-temurin-26 AS builder
 ARG MAVEN_MIRROR=https://repo.maven.apache.org/maven2
 WORKDIR /workspace
 COPY pom.xml .
