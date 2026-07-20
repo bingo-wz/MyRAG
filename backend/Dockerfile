@@ -12,7 +12,7 @@ COPY src src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -q -s /tmp/settings-docker.xml -DskipTests package
 
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 ARG UBUNTU_MIRROR=http://ports.ubuntu.com/ubuntu-ports
 RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_MIRROR}|g" /etc/apt/sources.list \
     && apt-get -o Acquire::Retries=5 update \
